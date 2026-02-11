@@ -5,6 +5,8 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
+__version__ = "1.0.0"
+
 import zipfile
 import json
 import xml.etree.ElementTree as ET
@@ -720,6 +722,8 @@ Examples:
                         help='Disable colored output (for Rich library)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose logging')
+    parser.add_argument('--version', action='version',
+                        version=f'%(prog)s {__version__}')
     
     args = parser.parse_args()
     

@@ -54,6 +54,7 @@ python3 analyze.py <file.3mf> [options]
 | Flag | Description |
 |------|-------------|
 | `-h`, `--help` | Show help message and exit |
+| `--version` | Show version number and exit |
 | `--diff` | Show comparison of custom values against profile defaults |
 | `--json` | Output raw JSON data |
 | `--no-color` | Disable colored output (useful for file redirection) |
