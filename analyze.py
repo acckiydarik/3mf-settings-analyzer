@@ -213,8 +213,8 @@ class ThreeMFAnalyzer:
                 if obj_id:
                     plate_objects.append({'object_id': obj_id, 'identify_id': identify_id})
             
-            # Sort by identify_id descending (like slicer does)
-            plate_objects.sort(key=lambda x: x['identify_id'], reverse=True)
+            # Sort by identify_id ascending (matches slicer display order)
+            plate_objects.sort(key=lambda x: x['identify_id'])
             
             if plate_id:
                 self.plates.append({
@@ -385,6 +385,16 @@ class ThreeMFAnalyzer:
                     part_extruder = part.get('extruder') or obj_extruder
                     part_custom = part.get('custom_settings', {})
                     
+                    # Check for part-specific overrides (use part's custom value or inherit from parent)
+                    part_infill = part_custom.get('sparse_infill_density') or part_custom.get('skeleton_infill_density') or obj_infill
+                    part_infill_custom = 'sparse_infill_density' in part_custom or 'skeleton_infill_density' in part_custom
+                    
+                    part_walls = part_custom.get('wall_loops') or obj_walls
+                    part_walls_custom = 'wall_loops' in part_custom
+                    
+                    part_speed = part_custom.get('outer_wall_speed') or obj_speed
+                    part_speed_custom = 'outer_wall_speed' in part_custom
+                    
                     # Inherit support from parent
                     part_support = 'On' if obj_support == '1' else 'Off'
                     
@@ -396,16 +406,16 @@ class ThreeMFAnalyzer:
                         'filament': part_extruder,
                         'layer_height': '',
                         'layer_custom': False,
-                        'wall_loops': obj_walls,
-                        'walls_custom': False,
-                        'infill': self._format_infill(obj_infill),
-                        'infill_custom': False,
+                        'wall_loops': part_walls,
+                        'walls_custom': part_walls_custom,
+                        'infill': self._format_infill(part_infill),
+                        'infill_custom': part_infill_custom,
                         'support': part_support,
                         'support_custom': False,
                         'brim': '',
                         'brim_custom': False,
-                        'outer_wall_speed': obj_speed,
-                        'speed_custom': False,
+                        'outer_wall_speed': part_speed,
+                        'speed_custom': part_speed_custom,
                         'custom_settings': part_custom,
                     })
         
