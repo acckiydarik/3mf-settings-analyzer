@@ -111,58 +111,59 @@ The analyzer produces several sections. Here is a full example:
 │ 3MF SETTINGS ANALYZER  │  example.3mf                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
-PROFILE
-  Printer       Bambu Lab A1 mini 0.4 nozzle
-  Process       0.20mm Standard @BBL A1M
-  Filament 1    Bambu PLA Basic @BBL A1M
+╭────────────────────────────────── PROFILE ───────────────────────────────────╮
+│   Printer       Bambu Lab A1 mini 0.4 nozzle                                 │
+│   Process       0.20mm Standard @BBL A1M                                     │
+│   Filament 1    Bambu PLA Basic @BBL A1M                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────── GLOBAL SETTINGS ───────────────────────────────╮
+│   Layer Height                0.2 mm                                         │
+│   Line Width                  0.42 mm                                        │
+│   Wall Loops                  2                                              │
+│   Sparse Infill Density       15%                                            │
+│   Top/Bottom Shell Layers     5/3                                            │
+│   Brim Type                   no_brim                                        │
+│   Enable Support              Off                                            │
+│   Seam Position               aligned                                        │
+│                                                                              │
+│   Outer Wall Speed            200 mm/s                                       │
+│   Inner Wall Speed            300 mm/s                                       │
+│   Travel Speed                700 mm/s                                       │
+│   Bridge Speed                50 mm/s                                        │
+│                                                                              │
+│   Sparse Infill Pattern       gyroid                                         │
+│   Top Surface Pattern         monotonicline                                  │
+│   Print Sequence              by layer                                       │
+│                                                                              │
+│   Retraction Length           0.8 mm                                         │
+│   Z-Hop                       0.4 mm                                         │
+│   Pressure Advance            0.02                                           │
+│   Fan Min/Max Speed           60% / 80%                                      │
+│   Slow Down for Layer Cooling On (6s)                                        │
+│                                                                              │
+│   Nozzle Temperature          220°C                                          │
+│   Bed Temperature             60°C                                           │
+│                                                                              │
+│   Features                    Arc Fitting, Overhang Speed                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────── CUSTOM GLOBAL SETTINGS (changed from profile) ────────────────╮
+│   seam_position               back                                           │
+│   wall_loops                  3                                              │
+│   sparse_infill_pattern       gyroid                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-GLOBAL SETTINGS
-  Layer Height          0.2 mm
-  First Layer Height    0.2 mm
-  Line Width            0.42 mm
-  Wall Loops            2
-  Infill                15%
-  Top/Bottom            5/3 layers
-  Brim                  no_brim
-  Support               Off
-  Seam                  aligned
-
-  Outer Wall     200 mm/s
-  Inner Wall     300 mm/s
-  Travel         700 mm/s
-  Bridge         50 mm/s
-
-  Infill Pattern    gyroid
-  Top Surface       monotonicline
-  Print Sequence    by layer
-
-  Retraction       0.8 mm
-  Z-Hop            0.4 mm
-  Pressure Adv     0.02
-  Fan Min/Max      60% / 80%
-  Slowdown         On (6s)
-
-  Nozzle Temp    220°C
-  Bed Temp       60°C
-  Features:  Arc Fitting, Overhang Slowdown
-
-CUSTOM GLOBAL SETTINGS (changed from profile)
-  * seam_position: back
-  * wall_loops: 3
-  * sparse_infill_pattern: gyroid
-
-OBJECTS
-╭───────┬──────────────────────────┬──────────┬───────┬───────┬────────┬─────────┬──────┬───────╮
-│ Plate │ Name                     │ Filament │ Layer │ Walls │ Infill │ Support │ Brim │ Speed │
-├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┼──────┼───────┤
-│   1   │ MyObject                 │    1     │  0.2  │   2   │   15   │   Off   │  No  │  200  │
-├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┼──────┼───────┤
-│   1   │ Assembly                 │    1     │  0.2  │   2   │  *80   │   *On   │  No  │  200  │
-│       │     ├─ enable_support: 1 │          │       │       │        │         │      │       │
-│       │     └─ sparse_infill: 80 │          │       │       │        │         │      │       │
-│       │   part_a                 │    1     │       │   2   │   80   │   On    │      │  200  │
-│       │   part_b                 │    2     │       │   2   │   80   │   On    │      │  200  │
-╰───────┴──────────────────────────┴──────────┴───────┴───────┴────────┴─────────┴──────┴───────╯
+                                    OBJECTS
+╭───────┬──────────────────────────┬──────────┬───────┬───────┬────────┬─────────╮
+│ Plate │ Name                     │ Filament │ Layer │ Walls │ Infill │ Support │
+├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┤
+│   1   │ MyObject                 │    1     │  0.2  │   2   │   15   │   Off   │
+├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┤
+│   1   │ Assembly                 │    1     │  0.2  │   2   │  *80   │   *On   │
+│       │     ├─ enable_support: 1 │          │       │       │        │         │
+│       │     └─ sparse_infill: 80 │          │       │       │        │         │
+│       │   part_a                 │    1     │       │   2   │   80   │   On    │
+│       │   part_b                 │    2     │       │   2   │   80   │   On    │
+╰───────┴──────────────────────────┴──────────┴───────┴───────┴────────┴─────────╯
 
 * = custom value (overrides profile default)
 ```

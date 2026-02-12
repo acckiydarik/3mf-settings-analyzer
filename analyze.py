@@ -5,7 +5,7 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 import zipfile
 import json
@@ -46,8 +46,12 @@ SYSTEM_KEYS = frozenset({
 # Filament colors by number for table display
 FILAMENT_COLORS = ('cyan', 'magenta', 'green', 'yellow', 'blue', 'red')
 
-# Plate colors - neutral/orange tones, different from filament colors
-PLATE_COLORS = ('white', 'dark_orange', 'wheat1', 'grey50')
+# Plate colors - distinct from filament colors, all clearly visible on dark bg
+PLATE_COLORS = (
+    'bright_white', 'dark_orange', 'wheat1', 'orchid',
+    'turquoise2', 'salmon1', 'chartreuse3', 'deep_sky_blue1',
+    'medium_purple1', 'gold1',
+)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -493,113 +497,81 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         for i, f in enumerate(filaments):
             profile_table.add_row(f"Filament {i+1}", f"[magenta]{f}[/magenta]")
     
-    console.print("\n[bold yellow]PROFILE[/bold yellow]")
-    console.print(profile_table)
+    console.print()
+    console.print(Panel(profile_table, title="[bold yellow]PROFILE[/bold yellow]",
+                        border_style="dim", box=box.ROUNDED))
     
     # ═══════════════════════════════════════════════════════════
-    # PROFILE SETTINGS
+    # GLOBAL SETTINGS (single merged table with section dividers)
     # ═══════════════════════════════════════════════════════════
-    settings_table = Table(show_header=False, box=None, padding=(0, 2))
-    settings_table.add_column("Key", style="dim")
-    settings_table.add_column("Value", style="white")
+    gs = Table(show_header=False, box=None, padding=(0, 2))
+    gs.add_column("Key", style="dim")
+    gs.add_column("Value", style="white")
     
-    # Basic
-    settings_table.add_row(wiki_label("Layer Height", "layer_height"), f"{profile['layer_height']} mm")
+    # -- Basic --
+    gs.add_row(wiki_label("Layer Height", "layer_height"), f"{profile['layer_height']} mm")
     if profile['initial_layer_print_height']:
-        settings_table.add_row(wiki_label("Initial Layer Print Height", "initial_layer_print_height"), f"{profile['initial_layer_print_height']} mm")
+        gs.add_row(wiki_label("Initial Layer Print Height", "initial_layer_print_height"), f"{profile['initial_layer_print_height']} mm")
     if profile['line_width']:
-        settings_table.add_row(wiki_label("Line Width", "line_width"), f"{profile['line_width']} mm")
+        gs.add_row(wiki_label("Line Width", "line_width"), f"{profile['line_width']} mm")
     if profile['print_flow_ratio'] and profile['print_flow_ratio'] != '1':
-        settings_table.add_row(wiki_label("Print Flow Ratio", "print_flow_ratio"), f"{float(profile['print_flow_ratio'])*100:.0f}%")
+        gs.add_row(wiki_label("Print Flow Ratio", "print_flow_ratio"), f"{float(profile['print_flow_ratio'])*100:.0f}%")
     elif profile['filament_flow_ratio']:
-        settings_table.add_row(wiki_label("Filament Flow Ratio", "filament_flow_ratio"), profile['filament_flow_ratio'])
-    settings_table.add_row(wiki_label("Wall Loops", "wall_loops"), profile['wall_loops'])
-    settings_table.add_row(wiki_label("Sparse Infill Density", "sparse_infill_density"), profile['sparse_infill_density'])
-    settings_table.add_row(wiki_label("Top/Bottom Shell Layers", "top_shell_layers"), f"{profile['top_shell_layers']}/{profile['bottom_shell_layers']}")
-    settings_table.add_row(wiki_label("Brim Type", "brim_type"), profile['brim_type'])
-    settings_table.add_row(wiki_label("Enable Support", "enable_support"), "On" if profile['enable_support'] == '1' else "Off")
-    settings_table.add_row(wiki_label("Seam Position", "seam_position"), profile['seam_position'])
+        gs.add_row(wiki_label("Filament Flow Ratio", "filament_flow_ratio"), profile['filament_flow_ratio'])
+    gs.add_row(wiki_label("Wall Loops", "wall_loops"), profile['wall_loops'])
+    gs.add_row(wiki_label("Sparse Infill Density", "sparse_infill_density"), profile['sparse_infill_density'])
+    gs.add_row(wiki_label("Top/Bottom Shell Layers", "top_shell_layers"), f"{profile['top_shell_layers']}/{profile['bottom_shell_layers']}")
+    gs.add_row(wiki_label("Brim Type", "brim_type"), profile['brim_type'])
+    gs.add_row(wiki_label("Enable Support", "enable_support"), "On" if profile['enable_support'] == '1' else "Off")
+    gs.add_row(wiki_label("Seam Position", "seam_position"), profile['seam_position'])
     
-    console.print("\n[bold yellow]GLOBAL SETTINGS[/bold yellow]")
-    console.print(settings_table)
-    
-    # Speeds
-    speed_table = Table(show_header=False, box=None, padding=(0, 2))
-    speed_table.add_column("Key", style="dim")
-    speed_table.add_column("Value", style="cyan")
-    
+    # -- Speeds --
+    gs.add_row("", "")
     if profile['initial_layer_speed']:
-        speed_table.add_row(wiki_label("Initial Layer Speed", "initial_layer_speed"), f"{profile['initial_layer_speed']} mm/s")
-    speed_table.add_row(wiki_label("Outer Wall Speed", "outer_wall_speed"), f"{profile['outer_wall_speed']} mm/s")
-    speed_table.add_row(wiki_label("Inner Wall Speed", "inner_wall_speed"), f"{profile['inner_wall_speed']} mm/s")
+        gs.add_row(wiki_label("Initial Layer Speed", "initial_layer_speed"), f"[cyan]{profile['initial_layer_speed']} mm/s[/cyan]")
+    gs.add_row(wiki_label("Outer Wall Speed", "outer_wall_speed"), f"[cyan]{profile['outer_wall_speed']} mm/s[/cyan]")
+    gs.add_row(wiki_label("Inner Wall Speed", "inner_wall_speed"), f"[cyan]{profile['inner_wall_speed']} mm/s[/cyan]")
     if profile['sparse_infill_speed']:
-        speed_table.add_row(wiki_label("Sparse Infill Speed", "sparse_infill_speed"), f"{profile['sparse_infill_speed']} mm/s")
+        gs.add_row(wiki_label("Sparse Infill Speed", "sparse_infill_speed"), f"[cyan]{profile['sparse_infill_speed']} mm/s[/cyan]")
     if profile['top_surface_speed']:
-        speed_table.add_row(wiki_label("Top Surface Speed", "top_surface_speed"), f"{profile['top_surface_speed']} mm/s")
-    speed_table.add_row(wiki_label("Travel Speed", "travel_speed"), f"{profile['travel_speed']} mm/s")
-    speed_table.add_row(wiki_label("Bridge Speed", "bridge_speed"), f"{profile['bridge_speed']} mm/s")
+        gs.add_row(wiki_label("Top Surface Speed", "top_surface_speed"), f"[cyan]{profile['top_surface_speed']} mm/s[/cyan]")
+    gs.add_row(wiki_label("Travel Speed", "travel_speed"), f"[cyan]{profile['travel_speed']} mm/s[/cyan]")
+    gs.add_row(wiki_label("Bridge Speed", "bridge_speed"), f"[cyan]{profile['bridge_speed']} mm/s[/cyan]")
     
-    console.print()
-    console.print(speed_table)
-    
-    # Patterns and modes
-    pattern_table = Table(show_header=False, box=None, padding=(0, 2))
-    pattern_table.add_column("Key", style="dim")
-    pattern_table.add_column("Value", style="white")
-    
-    pattern_table.add_row(wiki_label("Sparse Infill Pattern", "sparse_infill_pattern"), profile['sparse_infill_pattern'])
-    pattern_table.add_row(wiki_label("Top Surface Pattern", "top_surface_pattern"), profile['top_surface_pattern'])
-    pattern_table.add_row(wiki_label("Print Sequence", "print_sequence"), profile['print_sequence'])
-    
-    # Special modes (only if enabled)
+    # -- Patterns --
+    gs.add_row("", "")
+    gs.add_row(wiki_label("Sparse Infill Pattern", "sparse_infill_pattern"), profile['sparse_infill_pattern'])
+    gs.add_row(wiki_label("Top Surface Pattern", "top_surface_pattern"), profile['top_surface_pattern'])
+    gs.add_row(wiki_label("Print Sequence", "print_sequence"), profile['print_sequence'])
     if profile['spiral_mode'] == '1':
-        pattern_table.add_row(wiki_label("Spiral Mode (Vase)", "spiral_mode"), "[bright_green]ON[/bright_green]")
+        gs.add_row(wiki_label("Spiral Mode (Vase)", "spiral_mode"), "[bright_green]ON[/bright_green]")
     if profile['ironing_type'] != 'no ironing':
-        pattern_table.add_row(wiki_label("Ironing Type", "ironing_type"), f"[bright_green]{profile['ironing_type']}[/bright_green]")
+        gs.add_row(wiki_label("Ironing Type", "ironing_type"), f"[bright_green]{profile['ironing_type']}[/bright_green]")
     if profile['fuzzy_skin'] != 'none':
-        pattern_table.add_row(wiki_label("Fuzzy Skin", "fuzzy_skin"), f"[bright_green]{profile['fuzzy_skin']}[/bright_green]")
+        gs.add_row(wiki_label("Fuzzy Skin", "fuzzy_skin"), f"[bright_green]{profile['fuzzy_skin']}[/bright_green]")
     
-    console.print()
-    console.print(pattern_table)
-    
-    # Retract / Z-hop / PA
-    retract_table = Table(show_header=False, box=None, padding=(0, 2))
-    retract_table.add_column("Key", style="dim")
-    retract_table.add_column("Value", style="white")
-    
-    retract_table.add_row(wiki_label("Retraction Length", "retraction_length"), f"{profile['retraction_length']} mm")
+    # -- Retraction / Z-hop / PA / Fan / Cooling --
+    gs.add_row("", "")
+    gs.add_row(wiki_label("Retraction Length", "retraction_length"), f"{profile['retraction_length']} mm")
     if profile['retraction_speed']:
-        retract_table.add_row(wiki_label("Retraction Speed", "retraction_speed"), f"{profile['retraction_speed']} mm/s")
-    retract_table.add_row(wiki_label("Z-Hop", "z_hop"), f"{profile['z_hop']} mm")
+        gs.add_row(wiki_label("Retraction Speed", "retraction_speed"), f"{profile['retraction_speed']} mm/s")
+    gs.add_row(wiki_label("Z-Hop", "z_hop"), f"{profile['z_hop']} mm")
     if profile['pressure_advance']:
-        retract_table.add_row(wiki_label("Pressure Advance", "pressure_advance"), profile['pressure_advance'])
-    
-    # Fan
+        gs.add_row(wiki_label("Pressure Advance", "pressure_advance"), profile['pressure_advance'])
     if profile['fan_min_speed'] or profile['fan_max_speed']:
-        retract_table.add_row(wiki_label("Fan Min/Max Speed", "fan_min_speed"), f"{profile['fan_min_speed']}% / {profile['fan_max_speed']}%")
-    
-    # Cooling
+        gs.add_row(wiki_label("Fan Min/Max Speed", "fan_min_speed"), f"{profile['fan_min_speed']}% / {profile['fan_max_speed']}%")
     if profile['slow_down_for_layer_cooling'] == '1':
-        retract_table.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), f"[green]On[/green] ({profile['slow_down_layer_time']}s)")
+        gs.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), f"[green]On[/green] ({profile['slow_down_layer_time']}s)")
     else:
-        retract_table.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), "[dim]Off[/dim]")
+        gs.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), "[dim]Off[/dim]")
     
-    console.print()
-    console.print(retract_table)
-    
-    # Temperatures
-    temp_table = Table(show_header=False, box=None, padding=(0, 2))
-    temp_table.add_column("Key", style="dim")
-    temp_table.add_column("Value", style="bright_red")
-    
-    temp_table.add_row(wiki_label("Nozzle Temperature", "nozzle_temperature"), f"{profile['nozzle_temperature']}°C")
+    # -- Temperatures --
+    gs.add_row("", "")
+    gs.add_row(wiki_label("Nozzle Temperature", "nozzle_temperature"), f"[bright_red]{profile['nozzle_temperature']}°C[/bright_red]")
     if profile['bed_temperature']:
-        temp_table.add_row(wiki_label("Bed Temperature", "bed_temperature"), f"{profile['bed_temperature']}°C")
+        gs.add_row(wiki_label("Bed Temperature", "bed_temperature"), f"[bright_red]{profile['bed_temperature']}°C[/bright_red]")
     
-    console.print()
-    console.print(temp_table)
-    
-    # Advanced flags
+    # -- Features --
     flags = []
     if profile['enable_arc_fitting'] == '1':
         flags.append('Enable Arc Fitting')
@@ -608,17 +580,25 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     if profile['timelapse_type'] != '0':
         flags.append(f"Timelapse Type: {profile['timelapse_type']}")
     if flags:
-        console.print(f"  [dim]Features:[/dim]  [bright_cyan]{', '.join(flags)}[/bright_cyan]")
+        gs.add_row("", "")
+        gs.add_row("[dim]Features[/dim]", f"[bright_cyan]{', '.join(flags)}[/bright_cyan]")
+    
+    console.print(Panel(gs, title="[bold yellow]GLOBAL SETTINGS[/bold yellow]",
+                        border_style="dim", box=box.ROUNDED))
     
     # ═══════════════════════════════════════════════════════════
     # CUSTOM GLOBAL
     # ═══════════════════════════════════════════════════════════
     custom = result['custom_global']
     if custom:
-        console.print("\n[bold red]CUSTOM GLOBAL SETTINGS[/bold red] [dim](changed from profile)[/dim]")
+        custom_table = Table(show_header=False, box=None, padding=(0, 2))
+        custom_table.add_column("Key", style="yellow")
+        custom_table.add_column("Value", style="white")
         for k, v in custom.items():
-            label = wiki_key(k)
-            console.print(f"  [yellow]✎ {label}[/yellow]: {escape(str(v))}", highlight=False)
+            custom_table.add_row(f"✎ {wiki_key(k)}", escape(str(v)))
+        console.print(Panel(custom_table,
+                            title="[bold red]CUSTOM GLOBAL SETTINGS[/bold red] [dim](changed from profile)[/dim]",
+                            border_style="dim", box=box.ROUNDED))
     
     # ═══════════════════════════════════════════════════════════
     # OBJECTS TABLE
@@ -628,9 +608,10 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         console.print("\n[red]No objects found[/red]")
         return
     
-    console.print("\n[bold yellow]OBJECTS[/bold yellow]")
+    console.print()
+    console.print("[bold yellow]OBJECTS[/bold yellow]", justify="center")
     
-    table = Table(box=box.ROUNDED, show_lines=False, header_style="bold blue")
+    table = Table(box=box.ROUNDED, show_lines=False, header_style="bold blue", expand=True)
     table.add_column("Plate", justify="center", style="white", width=5)
     table.add_column("Name", style="white", min_width=20, max_width=50)
     table.add_column("Filament", justify="center", width=8)
