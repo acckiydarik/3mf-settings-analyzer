@@ -12,6 +12,7 @@ A command-line tool that extracts and displays print settings from 3MF files in 
 - **Multi-plate support** -- handles projects with multiple build plates
 - **Diff mode** -- side-by-side comparison of custom values against profile defaults
 - **JSON export** -- raw structured data output for scripting and automation
+- **Wiki links** -- clickable hyperlinks to [OrcaSlicer wiki](https://github.com/OrcaSlicer/OrcaSlicer/wiki) for each setting (`--wiki`)
 - **Colored terminal output** -- powered by [Rich](https://github.com/Textualize/rich)
 
 ### Supported slicers
@@ -57,8 +58,11 @@ python3 analyze.py <file.3mf> [options]
 | `--version` | Show version number and exit |
 | `--diff` | Show comparison of custom values against profile defaults |
 | `--json` | Output raw JSON data |
+| `-w`, `--wiki` | Add clickable wiki links to setting names (Cmd/Ctrl+click in terminal) |
 | `--no-color` | Disable colored output (useful for file redirection) |
 | `-v`, `--verbose` | Enable debug logging |
+| `--update-wiki` | Update settings wiki data from OrcaSlicer GitHub |
+| `--force-update-wiki` | Force re-download wiki data even if up to date |
 
 ### Examples
 
@@ -80,10 +84,22 @@ Export structured data as JSON:
 python3 analyze.py model.3mf --json
 ```
 
+With clickable wiki links on setting names:
+
+```bash
+python3 analyze.py model.3mf --wiki
+```
+
 Save plain-text output to a file:
 
 ```bash
 python3 analyze.py model.3mf --no-color > report.txt
+```
+
+Update wiki data from OrcaSlicer GitHub:
+
+```bash
+python3 analyze.py --update-wiki
 ```
 
 ## Output Overview
@@ -213,11 +229,16 @@ The analyzer reads `project_settings.config` for global/profile settings and `mo
 
 ```
 3mf-settings-analyzer/
-├── .gitignore          # Git ignore rules
 ├── analyze.py          # Main CLI script
-├── LICENSE             # MIT license
+├── settings_wiki.py    # OrcaSlicer settings reference module
+├── data/
+│   ├── PrintConfig.cpp     # OrcaSlicer source (setting definitions)
+│   ├── Tab.cpp             # OrcaSlicer source (wiki page mappings)
+│   └── settings_wiki.json  # Cached parsed settings metadata
+├── requirements.txt    # Python dependencies
 ├── README.md           # Documentation
-└── requirements.txt    # Python dependencies
+├── LICENSE             # MIT license
+└── .gitignore          # Git ignore rules
 ```
 
 ## Requirements

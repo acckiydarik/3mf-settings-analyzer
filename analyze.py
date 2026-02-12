@@ -5,7 +5,7 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import zipfile
 import json
@@ -432,9 +432,41 @@ class ThreeMFAnalyzer:
 # Output
 # ═══════════════════════════════════════════════════════════════
 
-def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: bool = False):
+def _make_wiki_helpers(enabled: bool):
+    """Create wiki_label and wiki_key helpers based on --wiki flag.
+
+    When disabled, returns no-op passthrough functions to avoid
+    importing settings_wiki module entirely.
+    """
+    if not enabled:
+        return (
+            lambda display_name, setting_key: display_name,
+            lambda setting_key: setting_key,
+        )
+
+    from settings_wiki import get_wiki_url
+
+    def wiki_label(display_name: str, setting_key: str) -> str:
+        """Wrap display_name in a Rich hyperlink to the OrcaSlicer wiki page."""
+        url = get_wiki_url(setting_key)
+        if url:
+            return f"[link={url}]{display_name}[/link]"
+        return display_name
+
+    def wiki_key(setting_key: str) -> str:
+        """Wrap a raw setting key in a Rich hyperlink to the wiki page."""
+        url = get_wiki_url(setting_key)
+        if url:
+            return f"[link={url}]{setting_key}[/link]"
+        return setting_key
+
+    return wiki_label, wiki_key
+
+
+def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: bool = False, wiki: bool = False):
     """Format and display analysis results using Rich tables."""
     
+    wiki_label, wiki_key = _make_wiki_helpers(wiki)
     console = Console(no_color=no_color)
     profile = result['profile']
     profile_full = result.get('profile_full', {})
@@ -472,21 +504,21 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     settings_table.add_column("Value", style="white")
     
     # Basic
-    settings_table.add_row("Layer Height", f"{profile['layer_height']} mm")
+    settings_table.add_row(wiki_label("Layer Height", "layer_height"), f"{profile['layer_height']} mm")
     if profile['initial_layer_print_height']:
-        settings_table.add_row("Initial Layer Print Height", f"{profile['initial_layer_print_height']} mm")
+        settings_table.add_row(wiki_label("Initial Layer Print Height", "initial_layer_print_height"), f"{profile['initial_layer_print_height']} mm")
     if profile['line_width']:
-        settings_table.add_row("Line Width", f"{profile['line_width']} mm")
+        settings_table.add_row(wiki_label("Line Width", "line_width"), f"{profile['line_width']} mm")
     if profile['print_flow_ratio'] and profile['print_flow_ratio'] != '1':
-        settings_table.add_row("Print Flow Ratio", f"{float(profile['print_flow_ratio'])*100:.0f}%")
+        settings_table.add_row(wiki_label("Print Flow Ratio", "print_flow_ratio"), f"{float(profile['print_flow_ratio'])*100:.0f}%")
     elif profile['filament_flow_ratio']:
-        settings_table.add_row("Filament Flow Ratio", profile['filament_flow_ratio'])
-    settings_table.add_row("Wall Loops", profile['wall_loops'])
-    settings_table.add_row("Sparse Infill Density", profile['sparse_infill_density'])
-    settings_table.add_row("Top/Bottom Shell Layers", f"{profile['top_shell_layers']}/{profile['bottom_shell_layers']}")
-    settings_table.add_row("Brim Type", profile['brim_type'])
-    settings_table.add_row("Enable Support", "On" if profile['enable_support'] == '1' else "Off")
-    settings_table.add_row("Seam Position", profile['seam_position'])
+        settings_table.add_row(wiki_label("Filament Flow Ratio", "filament_flow_ratio"), profile['filament_flow_ratio'])
+    settings_table.add_row(wiki_label("Wall Loops", "wall_loops"), profile['wall_loops'])
+    settings_table.add_row(wiki_label("Sparse Infill Density", "sparse_infill_density"), profile['sparse_infill_density'])
+    settings_table.add_row(wiki_label("Top/Bottom Shell Layers", "top_shell_layers"), f"{profile['top_shell_layers']}/{profile['bottom_shell_layers']}")
+    settings_table.add_row(wiki_label("Brim Type", "brim_type"), profile['brim_type'])
+    settings_table.add_row(wiki_label("Enable Support", "enable_support"), "On" if profile['enable_support'] == '1' else "Off")
+    settings_table.add_row(wiki_label("Seam Position", "seam_position"), profile['seam_position'])
     
     console.print("\n[bold yellow]GLOBAL SETTINGS[/bold yellow]")
     console.print(settings_table)
@@ -497,15 +529,15 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     speed_table.add_column("Value", style="cyan")
     
     if profile['initial_layer_speed']:
-        speed_table.add_row("Initial Layer Speed", f"{profile['initial_layer_speed']} mm/s")
-    speed_table.add_row("Outer Wall Speed", f"{profile['outer_wall_speed']} mm/s")
-    speed_table.add_row("Inner Wall Speed", f"{profile['inner_wall_speed']} mm/s")
+        speed_table.add_row(wiki_label("Initial Layer Speed", "initial_layer_speed"), f"{profile['initial_layer_speed']} mm/s")
+    speed_table.add_row(wiki_label("Outer Wall Speed", "outer_wall_speed"), f"{profile['outer_wall_speed']} mm/s")
+    speed_table.add_row(wiki_label("Inner Wall Speed", "inner_wall_speed"), f"{profile['inner_wall_speed']} mm/s")
     if profile['sparse_infill_speed']:
-        speed_table.add_row("Sparse Infill Speed", f"{profile['sparse_infill_speed']} mm/s")
+        speed_table.add_row(wiki_label("Sparse Infill Speed", "sparse_infill_speed"), f"{profile['sparse_infill_speed']} mm/s")
     if profile['top_surface_speed']:
-        speed_table.add_row("Top Surface Speed", f"{profile['top_surface_speed']} mm/s")
-    speed_table.add_row("Travel Speed", f"{profile['travel_speed']} mm/s")
-    speed_table.add_row("Bridge Speed", f"{profile['bridge_speed']} mm/s")
+        speed_table.add_row(wiki_label("Top Surface Speed", "top_surface_speed"), f"{profile['top_surface_speed']} mm/s")
+    speed_table.add_row(wiki_label("Travel Speed", "travel_speed"), f"{profile['travel_speed']} mm/s")
+    speed_table.add_row(wiki_label("Bridge Speed", "bridge_speed"), f"{profile['bridge_speed']} mm/s")
     
     console.print()
     console.print(speed_table)
@@ -515,17 +547,17 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     pattern_table.add_column("Key", style="dim")
     pattern_table.add_column("Value", style="white")
     
-    pattern_table.add_row("Sparse Infill Pattern", profile['sparse_infill_pattern'])
-    pattern_table.add_row("Top Surface Pattern", profile['top_surface_pattern'])
-    pattern_table.add_row("Print Sequence", profile['print_sequence'])
+    pattern_table.add_row(wiki_label("Sparse Infill Pattern", "sparse_infill_pattern"), profile['sparse_infill_pattern'])
+    pattern_table.add_row(wiki_label("Top Surface Pattern", "top_surface_pattern"), profile['top_surface_pattern'])
+    pattern_table.add_row(wiki_label("Print Sequence", "print_sequence"), profile['print_sequence'])
     
     # Special modes (only if enabled)
     if profile['spiral_mode'] == '1':
-        pattern_table.add_row("Spiral Mode (Vase)", "[bright_green]ON[/bright_green]")
+        pattern_table.add_row(wiki_label("Spiral Mode (Vase)", "spiral_mode"), "[bright_green]ON[/bright_green]")
     if profile['ironing_type'] != 'no ironing':
-        pattern_table.add_row("Ironing Type", f"[bright_green]{profile['ironing_type']}[/bright_green]")
+        pattern_table.add_row(wiki_label("Ironing Type", "ironing_type"), f"[bright_green]{profile['ironing_type']}[/bright_green]")
     if profile['fuzzy_skin'] != 'none':
-        pattern_table.add_row("Fuzzy Skin", f"[bright_green]{profile['fuzzy_skin']}[/bright_green]")
+        pattern_table.add_row(wiki_label("Fuzzy Skin", "fuzzy_skin"), f"[bright_green]{profile['fuzzy_skin']}[/bright_green]")
     
     console.print()
     console.print(pattern_table)
@@ -535,22 +567,22 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     retract_table.add_column("Key", style="dim")
     retract_table.add_column("Value", style="white")
     
-    retract_table.add_row("Retraction Length", f"{profile['retraction_length']} mm")
+    retract_table.add_row(wiki_label("Retraction Length", "retraction_length"), f"{profile['retraction_length']} mm")
     if profile['retraction_speed']:
-        retract_table.add_row("Retraction Speed", f"{profile['retraction_speed']} mm/s")
-    retract_table.add_row("Z-Hop", f"{profile['z_hop']} mm")
+        retract_table.add_row(wiki_label("Retraction Speed", "retraction_speed"), f"{profile['retraction_speed']} mm/s")
+    retract_table.add_row(wiki_label("Z-Hop", "z_hop"), f"{profile['z_hop']} mm")
     if profile['pressure_advance']:
-        retract_table.add_row("Pressure Advance", profile['pressure_advance'])
+        retract_table.add_row(wiki_label("Pressure Advance", "pressure_advance"), profile['pressure_advance'])
     
     # Fan
     if profile['fan_min_speed'] or profile['fan_max_speed']:
-        retract_table.add_row("Fan Min/Max Speed", f"{profile['fan_min_speed']}% / {profile['fan_max_speed']}%")
+        retract_table.add_row(wiki_label("Fan Min/Max Speed", "fan_min_speed"), f"{profile['fan_min_speed']}% / {profile['fan_max_speed']}%")
     
     # Cooling
     if profile['slow_down_for_layer_cooling'] == '1':
-        retract_table.add_row("Slow Down for Layer Cooling", f"[green]On[/green] ({profile['slow_down_layer_time']}s)")
+        retract_table.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), f"[green]On[/green] ({profile['slow_down_layer_time']}s)")
     else:
-        retract_table.add_row("Slow Down for Layer Cooling", "[dim]Off[/dim]")
+        retract_table.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), "[dim]Off[/dim]")
     
     console.print()
     console.print(retract_table)
@@ -560,9 +592,9 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     temp_table.add_column("Key", style="dim")
     temp_table.add_column("Value", style="bright_red")
     
-    temp_table.add_row("Nozzle Temperature", f"{profile['nozzle_temperature']}°C")
+    temp_table.add_row(wiki_label("Nozzle Temperature", "nozzle_temperature"), f"{profile['nozzle_temperature']}°C")
     if profile['bed_temperature']:
-        temp_table.add_row("Bed Temperature", f"{profile['bed_temperature']}°C")
+        temp_table.add_row(wiki_label("Bed Temperature", "bed_temperature"), f"{profile['bed_temperature']}°C")
     
     console.print()
     console.print(temp_table)
@@ -585,7 +617,8 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     if custom:
         console.print("\n[bold red]CUSTOM GLOBAL SETTINGS[/bold red] [dim](changed from profile)[/dim]")
         for k, v in custom.items():
-            console.print(f"  [yellow]✎ {k}[/yellow]: {escape(str(v))}", highlight=False)
+            label = wiki_key(k)
+            console.print(f"  [yellow]✎ {label}[/yellow]: {escape(str(v))}", highlight=False)
     
     # ═══════════════════════════════════════════════════════════
     # OBJECTS TABLE
@@ -686,10 +719,11 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
                 branch = "└─" if is_last else "├─"
                 # Look for default value in full profile
                 default_val = profile_full.get(key, '')
+                linked_key = wiki_key(key)
                 if show_diff and default_val and str(default_val) != str(value):
-                    setting_name = f"    [dim]{branch}[/dim] [yellow]{key}: {value}[/yellow] [dim]←{default_val}[/dim]"
+                    setting_name = f"    [dim]{branch}[/dim] [yellow]{linked_key}: {value}[/yellow] [dim]←{default_val}[/dim]"
                 else:
-                    setting_name = f"    [dim]{branch}[/dim] [yellow]{key}: {value}[/yellow]"
+                    setting_name = f"    [dim]{branch}[/dim] [yellow]{linked_key}: {value}[/yellow]"
                 # Empty row with setting only in Name column
                 table.add_row("", setting_name, "", "", "", "", "", "", "")
     
@@ -720,26 +754,44 @@ Examples:
   python analyze.py model.3mf --diff
   python analyze.py model.3mf --json
   python analyze.py model.3mf --verbose
+  python analyze.py model.3mf --wiki
   python analyze.py model.3mf --no-color > output.txt
+  python analyze.py --update-wiki
 """
     )
-    parser.add_argument('file', help='Path to 3MF file')
+    parser.add_argument('file', nargs='?', help='Path to 3MF file')
     parser.add_argument('--diff', action='store_true', 
                         help='Show comparison with global settings')
     parser.add_argument('--json', action='store_true',
                         help='Output raw JSON data')
     parser.add_argument('--no-color', action='store_true',
                         help='Disable colored output (for Rich library)')
+    parser.add_argument('--wiki', '-w', action='store_true',
+                        help='Add clickable wiki links to setting names (Cmd/Ctrl+click)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose logging')
     parser.add_argument('--version', action='version',
                         version=f'%(prog)s {__version__}')
+    parser.add_argument('--update-wiki', action='store_true',
+                        help='Update settings wiki data from OrcaSlicer GitHub')
+    parser.add_argument('--force-update-wiki', action='store_true',
+                        help='Force re-download wiki data even if up to date')
     
     args = parser.parse_args()
     
     setup_logging(verbose=args.verbose)
     
-    filepath = Path(args.file)
+    # Handle wiki update commands (no file required)
+    if args.update_wiki or args.force_update_wiki:
+        from settings_wiki import update as wiki_update
+        wiki_update(force=args.force_update_wiki)
+        if not args.file:
+            sys.exit(0)
+    
+    filepath = Path(args.file) if args.file else None
+    
+    if filepath is None:
+        parser.error("the following arguments are required: file")
     
     if not filepath.exists():
         logger.error("File not found: %s", filepath)
@@ -751,7 +803,7 @@ Examples:
     try:
         analyzer = ThreeMFAnalyzer(str(filepath))
         result = analyzer.analyze()
-        print_results(result, show_diff=args.diff, no_color=args.no_color)
+        print_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
         
         if args.json:
             print("\n--- JSON OUTPUT ---")
