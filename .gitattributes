@@ -1,0 +1,3 @@
+# Mark vendored OrcaSlicer source files as non-project code
+# so GitHub linguist does not count them in language statistics.
+data/*.cpp linguist-vendored
