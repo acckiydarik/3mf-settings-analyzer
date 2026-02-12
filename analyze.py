@@ -496,7 +496,6 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         for i, f in enumerate(filaments):
             profile_table.add_row(f"Filament {i+1}", f"[magenta]{f}[/magenta]")
     
-    console.print()
     console.print(Panel(profile_table, title="[bold bright_yellow]PROFILE[/bold bright_yellow]",
                         border_style="grey50", box=box.ROUNDED))
     
@@ -709,7 +708,6 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     console.print(table)
     
     # Legend
-    console.print()
     console.print("[bold yellow]*[/bold yellow] = custom value (overrides profile default)")
     print()
 

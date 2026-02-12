@@ -115,54 +115,62 @@ The analyzer produces several sections. Here is a full example:
 │   Printer       Bambu Lab A1 mini 0.4 nozzle                                 │
 │   Process       0.20mm Standard @BBL A1M                                     │
 │   Filament 1    Bambu PLA Basic @BBL A1M                                     │
+│   Filament 2    Bambu PLA Basic @BBL A1M                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭────────────────────────────── GLOBAL SETTINGS ───────────────────────────────╮
-│   Layer Height                0.2 mm                                         │
-│   Line Width                  0.42 mm                                        │
-│   Wall Loops                  2                                              │
-│   Sparse Infill Density       15%                                            │
-│   Top/Bottom Shell Layers     5/3                                            │
-│   Brim Type                   no_brim                                        │
-│   Enable Support              Off                                            │
-│   Seam Position               aligned                                        │
+│   Layer Height                   0.2 mm                                      │
+│   Initial Layer Print Height     0.2 mm                                      │
+│   Line Width                     0.42 mm                                     │
+│   Filament Flow Ratio            0.98                                        │
+│   Wall Loops                     3                                           │
+│   Sparse Infill Density          15%                                         │
+│   Top/Bottom Shell Layers        5/3                                         │
+│   Brim Type                      no_brim                                     │
+│   Enable Support                 Off                                         │
+│   Seam Position                  back                                        │
 │                                                                              │
-│   Outer Wall Speed            200 mm/s                                       │
-│   Inner Wall Speed            300 mm/s                                       │
-│   Travel Speed                700 mm/s                                       │
-│   Bridge Speed                50 mm/s                                        │
+│   Initial Layer Speed            50 mm/s                                     │
+│   Outer Wall Speed               200 mm/s                                    │
+│   Inner Wall Speed               300 mm/s                                    │
+│   Sparse Infill Speed            270 mm/s                                    │
+│   Top Surface Speed              200 mm/s                                    │
+│   Travel Speed                   700 mm/s                                    │
+│   Bridge Speed                   50 mm/s                                     │
 │                                                                              │
-│   Sparse Infill Pattern       gyroid                                         │
-│   Top Surface Pattern         monotonicline                                  │
-│   Print Sequence              by layer                                       │
+│   Sparse Infill Pattern          gyroid                                      │
+│   Top Surface Pattern            monotonicline                               │
+│   Print Sequence                 by object                                   │
+│   Ironing Type                   top                                         │
 │                                                                              │
-│   Retraction Length           0.8 mm                                         │
-│   Z-Hop                       0.4 mm                                         │
-│   Pressure Advance            0.02                                           │
-│   Fan Min/Max Speed           60% / 80%                                      │
-│   Slow Down for Layer Cooling On (6s)                                        │
+│   Retraction Length              0.8 mm                                      │
+│   Retraction Speed               30 mm/s                                     │
+│   Z-Hop                          0.4 mm                                      │
+│   Pressure Advance               0.02                                        │
+│   Fan Min/Max Speed              60% / 80%                                   │
+│   Slow Down for Layer Cooling    On (6s)                                     │
 │                                                                              │
-│   Nozzle Temperature          220°C                                          │
-│   Bed Temperature             60°C                                           │
+│   Nozzle Temperature             220°C                                       │
+│   Bed Temperature                60°C                                        │
 │                                                                              │
-│   Features                    Arc Fitting, Overhang Speed                    │
+│   Features                       Enable Arc Fitting, Enable Overhang Speed   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─────────────── CUSTOM GLOBAL SETTINGS (changed from profile) ────────────────╮
-│   seam_position               back                                           │
-│   wall_loops                  3                                              │
-│   sparse_infill_pattern       gyroid                                         │
+│   ✎ brim_object_gap          0.35                                            │
+│   ✎ print_sequence           by object                                       │
+│   ✎ seam_position            back                                            │
+│   ✎ wall_loops               3                                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
-                                    OBJECTS
+─────────────────────────────────── OBJECTS ───────────────────────────────────
 ╭───────┬──────────────────────────┬──────────┬───────┬───────┬────────┬─────────╮
 │ Plate │ Name                     │ Filament │ Layer │ Walls │ Infill │ Support │
 ├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┤
-│   1   │ MyObject                 │    1     │  0.2  │   2   │   15   │   Off   │
+│   1   │ MyObject                 │    1     │  0.2  │   3   │   15   │   Off   │
 ├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┤
-│   1   │ Assembly                 │    1     │  0.2  │   2   │  *80   │   *On   │
+│   1   │ Assembly                 │    1     │  0.2  │   3   │  *80   │   *On   │
 │       │     ├─ enable_support: 1 │          │       │       │        │         │
 │       │     └─ sparse_infill: 80 │          │       │       │        │         │
-│       │   part_a                 │    1     │       │   2   │   80   │   On    │
-│       │   part_b                 │    2     │       │   2   │   80   │   On    │
+│       │   part_a                 │    1     │       │   3   │   80   │   On    │
+│       │   part_b                 │    2     │       │   3   │   80   │   On    │
 ╰───────┴──────────────────────────┴──────────┴───────┴───────┴────────┴─────────╯
 
 * = custom value (overrides profile default)
