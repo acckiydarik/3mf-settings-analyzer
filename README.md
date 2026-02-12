@@ -239,7 +239,8 @@ The analyzer reads `project_settings.config` for global/profile settings and `mo
 ├── requirements.txt    # Python dependencies
 ├── README.md           # Documentation
 ├── LICENSE             # MIT license
-└── .gitignore          # Git ignore rules
+├── .gitignore          # Git ignore rules
+└── .gitattributes      # GitHub linguist overrides
 ```
 
 ## Requirements
