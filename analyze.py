@@ -478,7 +478,6 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     # ═══════════════════════════════════════════════════════════
     # HEADER
     # ═══════════════════════════════════════════════════════════
-    console.print()
     console.print(Panel(f"[bold cyan]3MF SETTINGS ANALYZER[/bold cyan]  │  {result['file']}", 
                         border_style="cyan"))
     
@@ -498,8 +497,8 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
             profile_table.add_row(f"Filament {i+1}", f"[magenta]{f}[/magenta]")
     
     console.print()
-    console.print(Panel(profile_table, title="[bold yellow]PROFILE[/bold yellow]",
-                        border_style="dim", box=box.ROUNDED))
+    console.print(Panel(profile_table, title="[bold bright_yellow]PROFILE[/bold bright_yellow]",
+                        border_style="grey50", box=box.ROUNDED))
     
     # ═══════════════════════════════════════════════════════════
     # GLOBAL SETTINGS (single merged table with section dividers)
@@ -567,9 +566,9 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     
     # -- Temperatures --
     gs.add_row("", "")
-    gs.add_row(wiki_label("Nozzle Temperature", "nozzle_temperature"), f"[bright_red]{profile['nozzle_temperature']}°C[/bright_red]")
+    gs.add_row(wiki_label("Nozzle Temperature", "nozzle_temperature"), f"[red]{profile['nozzle_temperature']}°C[/red]")
     if profile['bed_temperature']:
-        gs.add_row(wiki_label("Bed Temperature", "bed_temperature"), f"[bright_red]{profile['bed_temperature']}°C[/bright_red]")
+        gs.add_row(wiki_label("Bed Temperature", "bed_temperature"), f"[red]{profile['bed_temperature']}°C[/red]")
     
     # -- Features --
     flags = []
@@ -583,8 +582,8 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         gs.add_row("", "")
         gs.add_row("[dim]Features[/dim]", f"[bright_cyan]{', '.join(flags)}[/bright_cyan]")
     
-    console.print(Panel(gs, title="[bold yellow]GLOBAL SETTINGS[/bold yellow]",
-                        border_style="dim", box=box.ROUNDED))
+    console.print(Panel(gs, title="[bold bright_yellow]GLOBAL SETTINGS[/bold bright_yellow]",
+                        border_style="grey50", box=box.ROUNDED))
     
     # ═══════════════════════════════════════════════════════════
     # CUSTOM GLOBAL
@@ -597,8 +596,8 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         for k, v in custom.items():
             custom_table.add_row(f"✎ {wiki_key(k)}", escape(str(v)))
         console.print(Panel(custom_table,
-                            title="[bold red]CUSTOM GLOBAL SETTINGS[/bold red] [dim](changed from profile)[/dim]",
-                            border_style="dim", box=box.ROUNDED))
+                            title="[bold bright_red]CUSTOM GLOBAL SETTINGS[/bold bright_red] [grey50](changed from profile)[/grey50]",
+                            border_style="grey50", box=box.ROUNDED))
     
     # ═══════════════════════════════════════════════════════════
     # OBJECTS TABLE
@@ -608,10 +607,9 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         console.print("\n[red]No objects found[/red]")
         return
     
-    console.print()
-    console.print("[bold yellow]OBJECTS[/bold yellow]", justify="center")
+    console.rule("[bold bright_yellow]OBJECTS[/bold bright_yellow]", style="grey50")
     
-    table = Table(box=box.ROUNDED, show_lines=False, header_style="bold blue", expand=True)
+    table = Table(box=box.ROUNDED, show_lines=False, header_style="bold blue", expand=True, border_style="grey50")
     table.add_column("Plate", justify="center", style="white", width=5)
     table.add_column("Name", style="white", min_width=20, max_width=50)
     table.add_column("Filament", justify="center", width=8)
