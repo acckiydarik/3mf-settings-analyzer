@@ -388,9 +388,9 @@ class ThreeMFAnalyzer:
             'sparse_infill_pattern': self._get_value('sparse_infill_pattern', ''),
             'top_surface_pattern': self._get_value('top_surface_pattern', ''),
             # Special modes
-            'ironing_type': self._get_value('ironing_type', 'no ironing'),
-            'fuzzy_skin': self._get_value('fuzzy_skin', 'none'),
-            'spiral_mode': self._get_value('spiral_mode', '0'),
+            'ironing_type': self._get_value('ironing_type', ''),
+            'fuzzy_skin': self._get_value('fuzzy_skin', ''),
+            'spiral_mode': self._get_value('spiral_mode', ''),
             # Retraction and Z
             'retraction_length': self._get_value('retraction_length', ''),
             'retraction_speed': self._get_value('retraction_speed', ''),
@@ -399,15 +399,15 @@ class ThreeMFAnalyzer:
             'fan_min_speed': self._get_value('fan_min_speed', ''),
             'fan_max_speed': self._get_value('fan_max_speed', ''),
             # Cooling
-            'slow_down_for_layer_cooling': self._get_value('slow_down_for_layer_cooling', '0'),
+            'slow_down_for_layer_cooling': self._get_value('slow_down_for_layer_cooling', ''),
             'slow_down_layer_time': self._get_value('slow_down_layer_time', ''),
             # Advanced
             'pressure_advance': self._get_value('pressure_advance', ''),
-            'enable_arc_fitting': self._get_value('enable_arc_fitting', '0'),
-            'enable_overhang_speed': self._get_value('enable_overhang_speed', '0'),
+            'enable_arc_fitting': self._get_value('enable_arc_fitting', ''),
+            'enable_overhang_speed': self._get_value('enable_overhang_speed', ''),
             # Print modes
-            'print_sequence': self._get_value('print_sequence', 'by layer'),
-            'timelapse_type': self._get_value('timelapse_type', '0'),
+            'print_sequence': self._get_value('print_sequence', ''),
+            'timelapse_type': self._get_value('timelapse_type', ''),
             # Supports
             'support_type': self._get_value('support_type', ''),
             # Temperatures
@@ -647,9 +647,9 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     gs.add_row(wiki_label("Print Sequence", "print_sequence"), profile['print_sequence'])
     if profile['spiral_mode'] == BOOL_TRUE:
         gs.add_row(wiki_label("Spiral Mode (Vase)", "spiral_mode"), "[bright_green]ON[/bright_green]")
-    if profile['ironing_type'] != 'no ironing':
+    if profile['ironing_type'] and profile['ironing_type'] not in ('no ironing', 'no_ironing'):
         gs.add_row(wiki_label("Ironing Type", "ironing_type"), f"[bright_green]{profile['ironing_type']}[/bright_green]")
-    if profile['fuzzy_skin'] != 'none':
+    if profile['fuzzy_skin'] and profile['fuzzy_skin'] != 'none':
         gs.add_row(wiki_label("Fuzzy Skin", "fuzzy_skin"), f"[bright_green]{profile['fuzzy_skin']}[/bright_green]")
     
     # -- Retraction / Z-hop / PA / Fan / Cooling --
@@ -664,7 +664,7 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         gs.add_row(wiki_label("Fan Min/Max Speed", "fan_min_speed"), f"{profile['fan_min_speed']}% / {profile['fan_max_speed']}%")
     if profile['slow_down_for_layer_cooling'] == BOOL_TRUE:
         gs.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), f"[green]On[/green] ({profile['slow_down_layer_time']}s)")
-    else:
+    elif profile['slow_down_for_layer_cooling']:
         gs.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), "[dim]Off[/dim]")
     
     # -- Temperatures --
@@ -679,7 +679,7 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         flags.append('Enable Arc Fitting')
     if profile['enable_overhang_speed'] == BOOL_TRUE:
         flags.append('Enable Overhang Speed')
-    if profile['timelapse_type'] != '0':
+    if profile['timelapse_type'] and profile['timelapse_type'] != '0':
         flags.append(f"Timelapse Type: {profile['timelapse_type']}")
     if flags:
         gs.add_row("", "")

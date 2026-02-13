@@ -13,14 +13,15 @@ Usage:
         python settings_wiki.py
 """
 
-import json
 import hashlib
+import json
 import logging
+import os
 import re
 import sys
 import threading
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -30,8 +31,6 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════
 # Configuration
 # ═══════════════════════════════════════════════════════════════
-
-import os
 
 # Wiki base URL - can be overridden via environment variable
 WIKI_BASE = os.environ.get(
