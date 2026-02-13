@@ -382,7 +382,10 @@ def _get_github_sha(api_url: str) -> Optional[str]:
 
 
 def _download_file(raw_url: str, dest: Path) -> bool:
-    """Download a file from GitHub raw URL.
+    """Download a file from GitHub raw URL with atomic write.
+    
+    Uses a temporary file and rename to ensure atomic writes,
+    preventing partial/corrupted files on errors.
     
     Args:
         raw_url: URL to download from.
@@ -391,19 +394,37 @@ def _download_file(raw_url: str, dest: Path) -> bool:
     Returns:
         True if download succeeded, False otherwise.
     """
+    import tempfile
+    
     try:
         req = urllib.request.Request(raw_url)
         with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
             content = resp.read()
-        # Write to file after closing the connection to avoid resource leak
+        
+        # Validate content is not HTML error page (GitHub returns HTML on errors)
+        if content.startswith(b'<!DOCTYPE') or content.startswith(b'<html'):
+            logger.error("Downloaded HTML instead of expected file from %s", raw_url)
+            return False
+        
+        # Atomic write: write to temp file then rename
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(content)
+        with tempfile.NamedTemporaryFile(
+            mode='wb', dir=dest.parent, delete=False, suffix='.tmp'
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = Path(tmp.name)
+        
+        # Atomic rename (on POSIX) / replace on Windows
+        tmp_path.replace(dest)
         return True
     except urllib.error.URLError as e:
         logger.error("Failed to download %s: %s", raw_url, e)
         return False
     except OSError as e:
         logger.error("Failed to write file %s: %s", dest, e)
+        # Cleanup temp file if it exists
+        if 'tmp_path' in locals() and tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
         return False
 
 

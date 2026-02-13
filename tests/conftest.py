@@ -187,3 +187,152 @@ def sample_tab_cpp() -> str:
     line.append_option(optgroup->get_option("support_type"));
     optgroup->append_line(line);
 '''
+
+
+@pytest.fixture
+def multi_plate_3mf(temp_dir: Path, sample_project_settings: dict) -> Path:
+    """Create a 3MF file with multiple plates."""
+    threemf_path = temp_dir / "multi_plate.3mf"
+    
+    model_settings_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <plate>
+        <metadata key="plater_id" value="1"/>
+        <metadata key="plater_name" value="Plate 1"/>
+        <model_instance>
+            <metadata key="object_id" value="1"/>
+            <metadata key="identify_id" value="0"/>
+        </model_instance>
+    </plate>
+    <plate>
+        <metadata key="plater_id" value="2"/>
+        <metadata key="plater_name" value="Plate 2"/>
+        <model_instance>
+            <metadata key="object_id" value="2"/>
+            <metadata key="identify_id" value="0"/>
+        </model_instance>
+        <model_instance>
+            <metadata key="object_id" value="3"/>
+            <metadata key="identify_id" value="1"/>
+        </model_instance>
+    </plate>
+    <object id="1">
+        <metadata key="name" value="Object_Plate1"/>
+        <metadata key="extruder" value="1"/>
+    </object>
+    <object id="2">
+        <metadata key="name" value="Object_Plate2_First"/>
+        <metadata key="extruder" value="1"/>
+    </object>
+    <object id="3">
+        <metadata key="name" value="Object_Plate2_Second"/>
+        <metadata key="extruder" value="1"/>
+    </object>
+</config>
+'''
+    
+    with zipfile.ZipFile(threemf_path, 'w') as zf:
+        zf.writestr("Metadata/project_settings.config", json.dumps(sample_project_settings))
+        zf.writestr("Metadata/model_settings.config", model_settings_xml)
+        zf.writestr("3D/model.model", "<model></model>")
+    
+    return threemf_path
+
+
+@pytest.fixture
+def multi_part_object_3mf(temp_dir: Path, sample_project_settings: dict) -> Path:
+    """Create a 3MF file with an object containing multiple parts."""
+    threemf_path = temp_dir / "multi_part.3mf"
+    
+    model_settings_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <plate>
+        <metadata key="plater_id" value="1"/>
+        <metadata key="plater_name" value="Plate 1"/>
+        <model_instance>
+            <metadata key="object_id" value="1"/>
+            <metadata key="identify_id" value="0"/>
+        </model_instance>
+    </plate>
+    <object id="1">
+        <metadata key="name" value="MultiPartObject"/>
+        <metadata key="extruder" value="1"/>
+        <metadata key="wall_loops" value="3"/>
+        <part id="0" subtype="normal_part">
+            <metadata key="name" value="PartA"/>
+            <metadata key="extruder" value="1"/>
+            <metadata key="sparse_infill_density" value="30%"/>
+        </part>
+        <part id="1" subtype="normal_part">
+            <metadata key="name" value="PartB"/>
+            <metadata key="extruder" value="2"/>
+            <metadata key="sparse_infill_density" value="50%"/>
+        </part>
+        <part id="2" subtype="normal_part">
+            <metadata key="name" value="PartC"/>
+            <metadata key="extruder" value="1"/>
+        </part>
+    </object>
+</config>
+'''
+    
+    with zipfile.ZipFile(threemf_path, 'w') as zf:
+        zf.writestr("Metadata/project_settings.config", json.dumps(sample_project_settings))
+        zf.writestr("Metadata/model_settings.config", model_settings_xml)
+        zf.writestr("3D/model.model", "<model></model>")
+    
+    return threemf_path
+
+
+@pytest.fixture
+def unicode_names_3mf(temp_dir: Path, sample_project_settings: dict) -> Path:
+    """Create a 3MF file with Unicode object and part names."""
+    threemf_path = temp_dir / "unicode_names.3mf"
+    
+    model_settings_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <plate>
+        <metadata key="plater_id" value="1"/>
+        <metadata key="plater_name" value="Пластина 1"/>
+        <model_instance>
+            <metadata key="object_id" value="1"/>
+            <metadata key="identify_id" value="0"/>
+        </model_instance>
+    </plate>
+    <object id="1">
+        <metadata key="name" value="Тестовый_Объект_测试"/>
+        <metadata key="extruder" value="1"/>
+        <part id="0" subtype="normal_part">
+            <metadata key="name" value="Часть_日本語"/>
+            <metadata key="extruder" value="1"/>
+        </part>
+    </object>
+</config>
+'''
+    
+    with zipfile.ZipFile(threemf_path, 'w') as zf:
+        zf.writestr("Metadata/project_settings.config", json.dumps(sample_project_settings))
+        zf.writestr("Metadata/model_settings.config", model_settings_xml)
+        zf.writestr("3D/model.model", "<model></model>")
+    
+    return threemf_path
+
+
+@pytest.fixture
+def empty_list_settings_3mf(temp_dir: Path, sample_model_settings_xml: str) -> Path:
+    """Create a 3MF file with empty list values in settings."""
+    threemf_path = temp_dir / "empty_list.3mf"
+    
+    settings = {
+        "printer_settings_id": "Test Printer",
+        "print_settings_id": "Test Process",
+        "filament_settings_id": [],  # Empty list
+        "different_settings_to_system": [],
+    }
+    
+    with zipfile.ZipFile(threemf_path, 'w') as zf:
+        zf.writestr("Metadata/project_settings.config", json.dumps(settings))
+        zf.writestr("Metadata/model_settings.config", sample_model_settings_xml)
+        zf.writestr("3D/model.model", "<model></model>")
+    
+    return threemf_path

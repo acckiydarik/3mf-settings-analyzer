@@ -259,7 +259,7 @@ The analyzer reads `project_settings.config` for global/profile settings and `mo
 
 - Python 3.9+
 - [rich](https://github.com/Textualize/rich) >= 13.0.0
-- [defusedxml](https://github.com/tiran/defusedxml) >= 0.7.1 (recommended for XML security)
+- [defusedxml](https://github.com/tiran/defusedxml) >= 0.7.1 (**required** for XML security)
 
 ## Contributing
 

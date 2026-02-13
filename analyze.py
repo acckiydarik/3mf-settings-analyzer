@@ -5,7 +5,7 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.5.2"
+__version__ = "1.6.0"
 
 import zipfile
 import json
@@ -17,15 +17,13 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Callable, Tuple, Union
 
-# Use defusedxml to prevent XXE attacks
+# Use defusedxml to prevent XXE attacks - required dependency
 try:
     import defusedxml.ElementTree as ET
 except ImportError:
-    # Fallback to standard library with warning
-    import xml.etree.ElementTree as ET
-    logging.getLogger(__name__).warning(
-        "defusedxml not installed. Using standard xml.etree.ElementTree. "
-        "Install defusedxml for protection against XML attacks: pip install defusedxml"
+    raise ImportError(
+        "Required package 'defusedxml' is not installed. "
+        "Install it with: pip install defusedxml"
     )
 
 from rich.console import Console
@@ -312,6 +310,7 @@ class ThreeMFAnalyzer:
                         try:
                             identify_id = int(value)
                         except (ValueError, TypeError):
+                            logger.warning("Invalid identify_id value '%s', using default %d", value, DEFAULT_IDENTIFY_ID)
                             identify_id = DEFAULT_IDENTIFY_ID
                 if obj_id:
                     plate_objects.append({'object_id': obj_id, 'identify_id': identify_id})
@@ -342,7 +341,9 @@ class ThreeMFAnalyzer:
         if isinstance(val, list):
             if index == -1:
                 return val  # Return entire list
-            return val[index] if len(val) > index else default
+            if not val:  # Empty list
+                return default
+            return val[index] if 0 <= index < len(val) else default
         return val
     
     def _get_custom_global_settings(self) -> Dict[str, Any]:
@@ -558,7 +559,14 @@ def _make_wiki_helpers(enabled: bool) -> Tuple[Callable[[str, str], str], Callab
             lambda setting_key: setting_key,
         )
 
-    from settings_wiki import get_wiki_url
+    try:
+        from settings_wiki import get_wiki_url
+    except ImportError as e:
+        logger.warning("Wiki module unavailable: %s. Wiki links disabled.", e)
+        return (
+            lambda display_name, setting_key: display_name,
+            lambda setting_key: setting_key,
+        )
     from rich.markup import escape
 
     def wiki_label(display_name: str, setting_key: str) -> str:

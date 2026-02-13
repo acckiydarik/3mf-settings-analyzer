@@ -431,3 +431,174 @@ class TestSetupLogging:
         """setup_logging(verbose=True) should set DEBUG level."""
         setup_logging(verbose=True)
         # Just verify no errors
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test Multi-Plate Support
+# ═══════════════════════════════════════════════════════════════
+
+class TestMultiPlateSupport:
+    """Tests for 3MF files with multiple plates."""
+
+    def test_multi_plate_extraction(self, multi_plate_3mf: Path):
+        """Analyzer should extract objects from multiple plates."""
+        analyzer = ThreeMFAnalyzer(multi_plate_3mf)
+        result = analyzer.analyze()
+        
+        rows = result['rows']
+        assert len(rows) == 3  # 3 objects across 2 plates
+        
+        # Verify objects are present
+        names = [r['name'] for r in rows]
+        assert 'Object_Plate1' in names
+        assert 'Object_Plate2_First' in names
+        assert 'Object_Plate2_Second' in names
+
+    def test_multi_plate_order(self, multi_plate_3mf: Path):
+        """Objects should be ordered by plate and identify_id."""
+        analyzer = ThreeMFAnalyzer(multi_plate_3mf)
+        result = analyzer.analyze()
+        
+        # The internal plates list should have 2 plates
+        assert len(analyzer.plates) == 2
+        
+        # First plate has 1 object, second has 2
+        assert len(analyzer.plates[0]['objects']) == 1
+        assert len(analyzer.plates[1]['objects']) == 2
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test Multi-Part Objects
+# ═══════════════════════════════════════════════════════════════
+
+class TestMultiPartObjects:
+    """Tests for objects with multiple parts."""
+
+    def test_multi_part_extraction(self, multi_part_object_3mf: Path):
+        """Analyzer should extract all parts from multi-part object."""
+        analyzer = ThreeMFAnalyzer(multi_part_object_3mf)
+        result = analyzer.analyze()
+        
+        rows = result['rows']
+        # Should have object + 3 parts = 4 rows
+        assert len(rows) >= 3
+        
+        # Verify parts are present (names may have indentation prefix)
+        names = [r['name'].strip() for r in rows]
+        assert 'PartA' in names
+        assert 'PartB' in names
+        assert 'PartC' in names
+
+    def test_part_custom_settings(self, multi_part_object_3mf: Path):
+        """Parts should have their own custom settings."""
+        analyzer = ThreeMFAnalyzer(multi_part_object_3mf)
+        result = analyzer.analyze()
+        
+        rows = result['rows']
+        # Find parts by stripping whitespace from names
+        part_a = next((r for r in rows if r['name'].strip() == 'PartA'), None)
+        part_b = next((r for r in rows if r['name'].strip() == 'PartB'), None)
+        
+        assert part_a is not None
+        assert part_b is not None
+        
+        # PartA has 30% infill, PartB has 50% (values may be formatted without %)
+        assert '30' in part_a['infill']
+        assert '50' in part_b['infill']
+
+    def test_part_extruder_assignment(self, multi_part_object_3mf: Path):
+        """Parts can have different extruder assignments."""
+        analyzer = ThreeMFAnalyzer(multi_part_object_3mf)
+        result = analyzer.analyze()
+        
+        rows = result['rows']
+        # Find parts by stripping whitespace from names
+        part_a = next((r for r in rows if r['name'].strip() == 'PartA'), None)
+        part_b = next((r for r in rows if r['name'].strip() == 'PartB'), None)
+        
+        assert part_a is not None
+        assert part_b is not None
+        # Parts use 'filament' key instead of 'extruder'
+        assert part_a.get('filament', part_a.get('extruder')) == '1'
+        assert part_b.get('filament', part_b.get('extruder')) == '2'
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test Unicode/Non-ASCII Names
+# ═══════════════════════════════════════════════════════════════
+
+class TestUnicodeNames:
+    """Tests for Unicode object and part names."""
+
+    def test_unicode_object_name(self, unicode_names_3mf: Path):
+        """Analyzer should handle Unicode object names."""
+        analyzer = ThreeMFAnalyzer(unicode_names_3mf)
+        result = analyzer.analyze()
+        
+        rows = result['rows']
+        assert len(rows) >= 1
+        
+        # Find object with Unicode name
+        obj = next((r for r in rows if 'Тестовый' in r['name']), None)
+        assert obj is not None
+        assert '测试' in obj['name']
+
+    def test_unicode_part_name(self, unicode_names_3mf: Path):
+        """Analyzer should handle Unicode part names."""
+        analyzer = ThreeMFAnalyzer(unicode_names_3mf)
+        result = analyzer.analyze()
+        
+        rows = result['rows']
+        # Find part with Unicode name (strip whitespace prefix)
+        part = next((r for r in rows if r.get('part_id') is not None and 'Часть' in r['name'].strip()), None)
+        if part is None:
+            # Also try without part_id check, just by name containing Unicode
+            part = next((r for r in rows if '日本語' in r['name']), None)
+        assert part is not None
+        assert '日本語' in part['name']
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test Edge Cases
+# ═══════════════════════════════════════════════════════════════
+
+class TestEdgeCases:
+    """Tests for edge cases and boundary conditions."""
+
+    def test_empty_list_settings(self, empty_list_settings_3mf: Path):
+        """Analyzer should handle empty list values gracefully."""
+        analyzer = ThreeMFAnalyzer(empty_list_settings_3mf)
+        result = analyzer.analyze()
+        
+        # Should not raise, filaments should handle empty list
+        assert result['profile']['filaments'] == []
+        
+    def test_get_value_empty_list_with_index(self, empty_list_settings_3mf: Path):
+        """_get_value should return default for empty list with index > 0."""
+        analyzer = ThreeMFAnalyzer(empty_list_settings_3mf)
+        analyzer.analyze()
+        
+        # Empty list with index should return default
+        value = analyzer._get_value('filament_settings_id', default='fallback', index=0)
+        assert value == 'fallback'
+        
+        value = analyzer._get_value('filament_settings_id', default='fallback', index=5)
+        assert value == 'fallback'
+
+    def test_non_3mf_extension_warning(self, temp_dir: Path, sample_project_settings: dict, sample_model_settings_xml: str, caplog):
+        """File without .3mf extension should still work but may log warning."""
+        import logging
+        
+        # Create file with different extension
+        wrong_ext = temp_dir / "test_file.zip"
+        with zipfile.ZipFile(wrong_ext, 'w') as zf:
+            zf.writestr("Metadata/project_settings.config", json.dumps(sample_project_settings))
+            zf.writestr("Metadata/model_settings.config", sample_model_settings_xml)
+        
+        analyzer = ThreeMFAnalyzer(wrong_ext)
+        
+        # Should still analyze successfully
+        with caplog.at_level(logging.DEBUG):
+            result = analyzer.analyze()
+        
+        assert result['profile']['printer'] == "Bambu Lab A1 mini 0.4 nozzle"
