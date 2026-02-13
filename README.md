@@ -28,7 +28,7 @@ Works with 3MF files produced by:
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 
 ### Installation
 

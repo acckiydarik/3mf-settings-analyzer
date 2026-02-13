@@ -396,6 +396,11 @@ def _download_file(raw_url: str, dest: Path) -> bool:
     """
     import tempfile
     
+    # Security: only allow HTTPS downloads
+    if not raw_url.startswith('https://'):
+        logger.error("Refusing to download from non-HTTPS URL: %s", raw_url)
+        return False
+    
     try:
         req = urllib.request.Request(raw_url)
         with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:

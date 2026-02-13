@@ -5,7 +5,7 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 import zipfile
 import json
@@ -161,6 +161,7 @@ class ThreeMFAnalyzer:
         """Cleanup temporary files"""
         if self.temp_dir and self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
+        self.temp_dir = None
     
     def _parse_project_settings(self):
         """Parse project_settings.config (JSON).
@@ -708,6 +709,17 @@ def _print_custom_global(console: Console, custom: Dict[str, Any], wiki_key):
 
 
 def _format_object_value(val, is_custom: bool, default, show_diff: bool) -> str:
+    """Format object setting value with optional custom/diff markers.
+    
+    Args:
+        val: The value to format.
+        is_custom: Whether the value differs from profile default.
+        default: The profile default value (shown in diff mode).
+        show_diff: Whether to show the default value comparison.
+        
+    Returns:
+        Formatted string with Rich markup for styling.
+    """
     if not val:
         return ""
     s = str(val)
@@ -719,6 +731,15 @@ def _format_object_value(val, is_custom: bool, default, show_diff: bool) -> str:
 
 
 def _format_support_value(support: str, is_custom: bool) -> str:
+    """Format support enable/disable value with color coding.
+    
+    Args:
+        support: Support status ('On', 'Off', or empty).
+        is_custom: Whether the value differs from profile default.
+        
+    Returns:
+        Formatted string with Rich markup (green for On, dim for Off).
+    """
     if support == '':
         return ""
     elif support == 'On':

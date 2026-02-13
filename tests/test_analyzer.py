@@ -240,6 +240,95 @@ class TestGetValue:
 
 
 # ═══════════════════════════════════════════════════════════════
+# Test _get_custom_global_settings method
+# ═══════════════════════════════════════════════════════════════
+
+class TestGetCustomGlobalSettings:
+    """Tests for the _get_custom_global_settings method."""
+
+    def test_returns_dict(self, sample_3mf: Path):
+        """_get_custom_global_settings should return a dictionary."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        analyzer.analyze()
+        
+        custom = analyzer._get_custom_global_settings()
+        assert isinstance(custom, dict)
+
+    def test_extracts_diff_settings(self, sample_3mf: Path):
+        """Should extract settings listed in different_settings_to_system."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        analyzer.analyze()
+        
+        custom = analyzer._get_custom_global_settings()
+        # sample_project_settings has different_settings_to_system: ["wall_loops;seam_position"]
+        assert 'wall_loops' in custom
+        assert 'seam_position' in custom
+        assert custom['wall_loops'] == '3'
+        assert custom['seam_position'] == 'back'
+
+    def test_unwraps_single_element_list(self, temp_dir: Path, sample_model_settings_xml: str):
+        """Should unwrap single-element lists to their value."""
+        project_settings = {
+            "printer_settings_id": "Test Printer",
+            "print_settings_id": "Test Process",
+            "filament_settings_id": ["Test Filament"],
+            "some_setting": ["single_value"],
+            "different_settings_to_system": ["some_setting"],
+        }
+        
+        threemf_path = temp_dir / "unwrap_test.3mf"
+        with zipfile.ZipFile(threemf_path, 'w') as zf:
+            zf.writestr("Metadata/project_settings.config", json.dumps(project_settings))
+            zf.writestr("Metadata/model_settings.config", sample_model_settings_xml)
+        
+        analyzer = ThreeMFAnalyzer(threemf_path)
+        analyzer.analyze()
+        
+        custom = analyzer._get_custom_global_settings()
+        # Single-element list should be unwrapped
+        assert custom['some_setting'] == 'single_value'
+
+    def test_handles_empty_diff_settings(self, temp_dir: Path, sample_model_settings_xml: str):
+        """Should return empty dict when different_settings_to_system is empty."""
+        project_settings = {
+            "printer_settings_id": "Test Printer",
+            "print_settings_id": "Test Process",
+            "filament_settings_id": ["Test Filament"],
+            "different_settings_to_system": [""],
+        }
+        
+        threemf_path = temp_dir / "empty_diff_test.3mf"
+        with zipfile.ZipFile(threemf_path, 'w') as zf:
+            zf.writestr("Metadata/project_settings.config", json.dumps(project_settings))
+            zf.writestr("Metadata/model_settings.config", sample_model_settings_xml)
+        
+        analyzer = ThreeMFAnalyzer(threemf_path)
+        analyzer.analyze()
+        
+        custom = analyzer._get_custom_global_settings()
+        assert custom == {}
+
+    def test_handles_missing_diff_settings(self, temp_dir: Path, sample_model_settings_xml: str):
+        """Should return empty dict when different_settings_to_system is missing."""
+        project_settings = {
+            "printer_settings_id": "Test Printer",
+            "print_settings_id": "Test Process",
+            "filament_settings_id": ["Test Filament"],
+        }
+        
+        threemf_path = temp_dir / "no_diff_test.3mf"
+        with zipfile.ZipFile(threemf_path, 'w') as zf:
+            zf.writestr("Metadata/project_settings.config", json.dumps(project_settings))
+            zf.writestr("Metadata/model_settings.config", sample_model_settings_xml)
+        
+        analyzer = ThreeMFAnalyzer(threemf_path)
+        analyzer.analyze()
+        
+        custom = analyzer._get_custom_global_settings()
+        assert custom == {}
+
+
+# ═══════════════════════════════════════════════════════════════
 # Test format functions
 # ═══════════════════════════════════════════════════════════════
 
