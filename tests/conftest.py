@@ -1,22 +1,16 @@
 """Shared pytest fixtures for 3MF Settings Analyzer tests."""
 
 import json
-import os
-import shutil
-import tempfile
 import zipfile
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
 
 @pytest.fixture
-def temp_dir() -> Generator[Path, None, None]:
-    """Create a temporary directory for tests."""
-    tmpdir = Path(tempfile.mkdtemp())
-    yield tmpdir
-    shutil.rmtree(tmpdir, ignore_errors=True)
+def temp_dir(tmp_path: Path) -> Path:
+    """Alias for pytest's built-in tmp_path fixture."""
+    return tmp_path
 
 
 @pytest.fixture

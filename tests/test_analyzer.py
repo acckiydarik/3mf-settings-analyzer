@@ -1,19 +1,21 @@
 """Unit tests for analyze.py module."""
 
 import json
+import sys
 import zipfile
+from io import StringIO
 from pathlib import Path
-from typing import Any
+from unittest.mock import patch
+from xml.etree.ElementTree import ParseError
 
 import pytest
-
-# Import module under test
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from analyze import (
     ThreeMFAnalyzer,
     _is_custom,
+    main,
+    print_results,
+    setup_logging,
     BOOL_TRUE,
     BOOL_FALSE,
     DEFAULT_EXTRUDER,
@@ -174,8 +176,7 @@ class TestErrorHandling:
         """Invalid XML in model_settings should raise ParseError."""
         analyzer = ThreeMFAnalyzer(invalid_xml_3mf)
         
-        # This will raise ET.ParseError (or xml.etree.ElementTree.ParseError)
-        with pytest.raises(Exception):  # ParseError inheritance varies
+        with pytest.raises(ParseError):
             analyzer.analyze()
 
     def test_nonexistent_file_raises_error(self, temp_dir: Path):
@@ -245,48 +246,33 @@ class TestGetValue:
 class TestFormatFunctions:
     """Tests for formatting helper functions."""
 
-    def test_format_brim_mapping(self, sample_3mf: Path):
+    @pytest.mark.parametrize("input_val,expected", [
+        ('no_brim', 'No'),
+        ('brim_ears', 'Mouse ear'),
+        ('outer_only', 'Outer'),
+        ('inner_only', 'Inner'),
+        ('outer_and_inner', 'Both'),
+        ('some_new_type', 'some_new_type'),
+        ('', ''),
+        (None, ''),
+    ])
+    def test_format_brim(self, sample_3mf: Path, input_val, expected):
         """_format_brim should correctly map brim types."""
         analyzer = ThreeMFAnalyzer(sample_3mf)
-        
-        assert analyzer._format_brim('no_brim') == 'No'
-        assert analyzer._format_brim('brim_ears') == 'Mouse ear'
-        assert analyzer._format_brim('outer_only') == 'Outer'
-        assert analyzer._format_brim('inner_only') == 'Inner'
-        assert analyzer._format_brim('outer_and_inner') == 'Both'
+        assert analyzer._format_brim(input_val) == expected
 
-    def test_format_brim_unknown(self, sample_3mf: Path):
-        """_format_brim should return unknown types as-is."""
+    @pytest.mark.parametrize("input_val,expected", [
+        ('15%', '15'),
+        ('100%', '100'),
+        ('0%', '0'),
+        (15, '15'),
+        (0, '0'),
+        (None, ''),
+    ])
+    def test_format_infill(self, sample_3mf: Path, input_val, expected):
+        """_format_infill should handle various input types."""
         analyzer = ThreeMFAnalyzer(sample_3mf)
-        
-        assert analyzer._format_brim('some_new_type') == 'some_new_type'
-
-    def test_format_brim_empty(self, sample_3mf: Path):
-        """_format_brim should return empty string for empty input."""
-        analyzer = ThreeMFAnalyzer(sample_3mf)
-        
-        assert analyzer._format_brim('') == ''
-        assert analyzer._format_brim(None) == ''
-
-    def test_format_infill_removes_percent(self, sample_3mf: Path):
-        """_format_infill should remove % sign."""
-        analyzer = ThreeMFAnalyzer(sample_3mf)
-        
-        assert analyzer._format_infill('15%') == '15'
-        assert analyzer._format_infill('100%') == '100'
-
-    def test_format_infill_handles_none(self, sample_3mf: Path):
-        """_format_infill should return empty string for None."""
-        analyzer = ThreeMFAnalyzer(sample_3mf)
-        
-        assert analyzer._format_infill(None) == ''
-
-    def test_format_infill_handles_numeric(self, sample_3mf: Path):
-        """_format_infill should handle numeric values."""
-        analyzer = ThreeMFAnalyzer(sample_3mf)
-        
-        assert analyzer._format_infill(15) == '15'
-        assert analyzer._format_infill(0) == '0'
+        assert analyzer._format_infill(input_val) == expected
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -315,3 +301,133 @@ class TestConstants:
         """Infill density keys should include both variants."""
         assert 'sparse_infill_density' in INFILL_DENSITY_KEYS
         assert 'skeleton_infill_density' in INFILL_DENSITY_KEYS
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test CLI / main() function
+# ═══════════════════════════════════════════════════════════════
+
+class TestCLI:
+    """Tests for command-line interface and main() function."""
+
+    def test_main_with_file(self, sample_3mf: Path):
+        """main() should work with a valid 3MF file."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf)]):
+            # Should not raise an exception
+            main()
+
+    def test_main_json_output(self, sample_3mf: Path, capsys):
+        """--json flag should output valid JSON."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--json']):
+            main()
+        
+        captured = capsys.readouterr()
+        # Verify output is valid JSON
+        data = json.loads(captured.out)
+        assert 'file' in data
+        assert 'profile' in data
+        assert 'rows' in data
+
+    def test_main_diff_mode(self, sample_3mf: Path, capsys):
+        """--diff flag should not cause errors."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--diff']):
+            main()
+        
+        # Output should contain something (table output)
+        captured = capsys.readouterr()
+        assert len(captured.out) > 0
+
+    def test_main_no_color(self, sample_3mf: Path):
+        """--no-color flag should work without errors."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--no-color']):
+            main()
+
+    def test_main_wiki_mode(self, sample_3mf: Path):
+        """--wiki flag should work without errors."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--wiki']):
+            main()
+
+    def test_main_verbose_mode(self, sample_3mf: Path):
+        """--verbose flag should enable debug logging."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--verbose']):
+            main()
+
+    def test_main_combined_flags(self, sample_3mf: Path, capsys):
+        """Multiple flags should work together."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--diff', '--wiki', '--no-color']):
+            main()
+        
+        captured = capsys.readouterr()
+        assert len(captured.out) > 0
+
+    def test_main_missing_file_exits(self):
+        """main() should exit with error if no file provided."""
+        with patch.object(sys, 'argv', ['analyze.py']):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code != 0
+
+    def test_main_nonexistent_file_exits(self, temp_dir: Path):
+        """main() should exit with error for non-existent file."""
+        fake_path = temp_dir / "does_not_exist.3mf"
+        with patch.object(sys, 'argv', ['analyze.py', str(fake_path)]):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 1
+
+    def test_main_bad_zip_exits(self, temp_dir: Path):
+        """main() should exit with error for invalid ZIP file."""
+        bad_file = temp_dir / "bad.3mf"
+        bad_file.write_text("not a zip")
+        
+        with patch.object(sys, 'argv', ['analyze.py', str(bad_file)]):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 1
+
+
+class TestPrintResults:
+    """Tests for print_results function."""
+
+    def test_print_results_basic(self, sample_3mf: Path):
+        """print_results should not raise with valid data."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        result = analyzer.analyze()
+        
+        # Should not raise
+        print_results(result)
+
+    def test_print_results_diff_mode(self, sample_3mf: Path):
+        """print_results with show_diff=True should work."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        result = analyzer.analyze()
+        
+        print_results(result, show_diff=True)
+
+    def test_print_results_no_color(self, sample_3mf: Path):
+        """print_results with no_color=True should work."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        result = analyzer.analyze()
+        
+        print_results(result, no_color=True)
+
+    def test_print_results_wiki_mode(self, sample_3mf: Path):
+        """print_results with wiki=True should work."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        result = analyzer.analyze()
+        
+        print_results(result, wiki=True)
+
+
+class TestSetupLogging:
+    """Tests for setup_logging function."""
+
+    def test_setup_logging_default(self):
+        """setup_logging() should set INFO level by default."""
+        setup_logging(verbose=False)
+        # Just verify no errors
+
+    def test_setup_logging_verbose(self):
+        """setup_logging(verbose=True) should set DEBUG level."""
+        setup_logging(verbose=True)
+        # Just verify no errors

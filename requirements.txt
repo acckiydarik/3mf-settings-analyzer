@@ -3,6 +3,3 @@
 
 rich>=13.0.0
 defusedxml>=0.7.1
-
-# Development dependencies
-pytest>=7.0.0

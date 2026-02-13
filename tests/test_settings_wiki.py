@@ -1,21 +1,19 @@
 """Unit tests for settings_wiki.py module."""
 
 import json
-import tempfile
+import sys
 import threading
+from io import BytesIO
 from pathlib import Path
-from typing import Optional
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-# Import module under test
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from settings_wiki import (
     _parse_print_config,
     _parse_tab_cpp,
+    update,
+    _download_file,
     get_wiki_url,
     get_setting_info,
     get_all_settings,
@@ -359,3 +357,215 @@ class TestThreadSafety:
         assert len(errors) == 0
         # All results should be dictionaries
         assert all(isinstance(r, dict) for r in results)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test update() function with mocks
+# ═══════════════════════════════════════════════════════════════
+
+class TestUpdate:
+    """Tests for update() function with mocked HTTP calls."""
+
+    @pytest.fixture
+    def mock_urlopen(self):
+        """Create a mock for urllib.request.urlopen."""
+        def create_response(content: bytes):
+            response = MagicMock()
+            response.read.return_value = content
+            response.__enter__ = lambda s: s
+            response.__exit__ = MagicMock(return_value=False)
+            return response
+        return create_response
+
+    def test_update_downloads_when_files_missing(self, tmp_path: Path, mock_urlopen):
+        """update() should download files if local files are missing."""
+        fake_content = b'// fake C++ content'
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path), \
+             patch('settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'), \
+             patch('settings_wiki.urllib.request.urlopen') as mock_url:
+            
+            mock_url.return_value = mock_urlopen(fake_content)
+            
+            # Simulate missing local files
+            result = update(force=False)
+            
+            # Should have tried to download
+            assert mock_url.called
+
+    def test_update_force_skips_hash_check(self, tmp_path: Path, mock_urlopen):
+        """update(force=True) should always download."""
+        fake_content = b'// fake C++ content'
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path), \
+             patch('settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'), \
+             patch('settings_wiki.urllib.request.urlopen') as mock_url:
+            
+            mock_url.return_value = mock_urlopen(fake_content)
+            
+            result = update(force=True)
+            
+            # urlopen should be called for downloads
+            assert mock_url.called
+
+    def test_update_returns_false_if_up_to_date(self, tmp_path: Path, mock_urlopen):
+        """update() should return False if content hash matches."""
+        import hashlib
+        
+        fake_content = b'// same content'
+        content_hash = hashlib.sha256(fake_content).hexdigest()[:12]
+        
+        # Create existing JSON with matching hash
+        json_path = tmp_path / 'settings_wiki.json'
+        json_path.write_text(json.dumps({
+            '_meta': {'sha': {'Tab.cpp': content_hash, 'PrintConfig.cpp': content_hash}},
+            'settings': {}
+        }))
+        
+        # Create local cpp files
+        (tmp_path / 'Tab.cpp').write_bytes(fake_content)
+        (tmp_path / 'PrintConfig.cpp').write_bytes(fake_content)
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path), \
+             patch('settings_wiki._JSON_PATH', json_path), \
+             patch('settings_wiki.urllib.request.urlopen') as mock_url:
+            
+            mock_url.return_value = mock_urlopen(fake_content)
+            
+            result = update(force=False)
+            
+            # Should return False (already up to date)
+            assert result is False
+
+    def test_update_returns_true_when_content_changed(self, tmp_path: Path, mock_urlopen):
+        """update() should return True if content changed."""
+        old_content = b'// old content'
+        new_content = b'// new content'
+        old_hash = '000000000000'  # Fake old hash
+        
+        # Create existing JSON with old hash
+        json_path = tmp_path / 'settings_wiki.json'
+        json_path.write_text(json.dumps({
+            '_meta': {'sha': {'Tab.cpp': old_hash, 'PrintConfig.cpp': old_hash}},
+            'settings': {}
+        }))
+        
+        # Create local cpp files
+        (tmp_path / 'Tab.cpp').write_bytes(old_content)
+        (tmp_path / 'PrintConfig.cpp').write_bytes(old_content)
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path), \
+             patch('settings_wiki._JSON_PATH', json_path), \
+             patch('settings_wiki.urllib.request.urlopen') as mock_url, \
+             patch('settings_wiki.generate_json'):
+            
+            mock_url.return_value = mock_urlopen(new_content)
+            
+            result = update(force=False)
+            
+            # Should return True (content updated)
+            assert result is True
+
+
+class TestDownloadFile:
+    """Tests for _download_file function."""
+
+    def test_download_success(self, tmp_path: Path):
+        """Successful download should write file and return True."""
+        fake_content = b'downloaded content'
+        dest = tmp_path / 'test_file.cpp'
+        
+        response = MagicMock()
+        response.read.return_value = fake_content
+        response.__enter__ = lambda s: s
+        response.__exit__ = MagicMock(return_value=False)
+        
+        with patch('settings_wiki.urllib.request.urlopen', return_value=response):
+            result = _download_file('https://example.com/file.cpp', dest)
+        
+        assert result is True
+        assert dest.exists()
+        assert dest.read_bytes() == fake_content
+
+    def test_download_network_error(self, tmp_path: Path):
+        """Network error should return False."""
+        import urllib.error
+        
+        dest = tmp_path / 'test_file.cpp'
+        
+        with patch('settings_wiki.urllib.request.urlopen') as mock_url:
+            mock_url.side_effect = urllib.error.URLError('Connection refused')
+            
+            result = _download_file('https://example.com/file.cpp', dest)
+        
+        assert result is False
+        assert not dest.exists()
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test CLI --update-wiki flag
+# ═══════════════════════════════════════════════════════════════
+
+class TestCLIUpdateWiki:
+    """Tests for --update-wiki and --force-update-wiki CLI flags."""
+
+    def test_update_wiki_flag(self):
+        """--update-wiki should call settings_wiki.update()."""
+        from analyze import main
+        
+        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+             patch('settings_wiki.update') as mock_update:
+            
+            mock_update.return_value = True
+            
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            
+            # Should exit with 0 (success)
+            assert exc_info.value.code == 0
+            mock_update.assert_called_once_with(force=False)
+
+    def test_force_update_wiki_flag(self):
+        """--force-update-wiki should call settings_wiki.update(force=True)."""
+        from analyze import main
+        
+        with patch.object(sys, 'argv', ['analyze.py', '--force-update-wiki']), \
+             patch('settings_wiki.update') as mock_update:
+            
+            mock_update.return_value = True
+            
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            
+            assert exc_info.value.code == 0
+            mock_update.assert_called_once_with(force=True)
+
+    def test_update_wiki_already_up_to_date(self, capsys):
+        """--update-wiki should report if already up to date."""
+        from analyze import main
+        
+        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+             patch('settings_wiki.update') as mock_update:
+            
+            mock_update.return_value = False  # Already up to date
+            
+            with pytest.raises(SystemExit):
+                main()
+            
+            captured = capsys.readouterr()
+            assert 'up to date' in captured.out.lower()
+
+    def test_update_wiki_error_handling(self, capsys):
+        """--update-wiki should handle errors gracefully."""
+        from analyze import main
+        
+        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+             patch('settings_wiki.update') as mock_update:
+            
+            mock_update.side_effect = Exception('Network error')
+            
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            
+            # Should exit with error code
+            assert exc_info.value.code == 1

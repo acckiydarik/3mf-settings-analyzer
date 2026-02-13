@@ -260,7 +260,6 @@ The analyzer reads `project_settings.config` for global/profile settings and `mo
 - Python 3.9+
 - [rich](https://github.com/Textualize/rich) >= 13.0.0
 - [defusedxml](https://github.com/tiran/defusedxml) >= 0.7.1 (recommended for XML security)
-- [pytest](https://docs.pytest.org/) >= 7.0.0 (for development/testing)
 
 ## Contributing
 
@@ -273,7 +272,7 @@ Contributions are welcome. If you found a bug or have a feature request, please 
 Install development dependencies and run the test suite:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
