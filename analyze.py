@@ -43,6 +43,13 @@ SYSTEM_KEYS = frozenset({
     'source_offset_x', 'source_offset_y', 'source_offset_z'
 })
 
+# Boolean string values used in 3MF configs
+BOOL_TRUE = '1'
+BOOL_FALSE = '0'
+
+# Infill density setting keys (skeleton_infill_density is legacy alias)
+INFILL_DENSITY_KEYS = ('sparse_infill_density', 'skeleton_infill_density')
+
 # Filament colors by number for table display
 FILAMENT_COLORS = ('cyan', 'magenta', 'green', 'yellow', 'blue', 'red')
 
@@ -111,8 +118,16 @@ class ThreeMFAnalyzer:
         
         logger.debug("Parsing model settings from: %s", config_path)
         
-        tree = ET.parse(config_path)
-        root = tree.getroot()
+        try:
+            tree = ET.parse(config_path)
+            root = tree.getroot()
+        except ET.ParseError as e:
+            logger.error("Invalid XML in model_settings.config: %s", e)
+            raise
+        
+        # Validate root element
+        if root.tag != 'config':
+            logger.warning("Unexpected root element '%s' in model_settings.config, expected 'config'", root.tag)
         
         # Parse all objects
         for obj in root.findall('.//object'):
@@ -146,7 +161,7 @@ class ThreeMFAnalyzer:
                 elif key == 'wall_loops':
                     obj_data['wall_loops'] = value
                     obj_data['custom_settings']['wall_loops'] = value
-                elif key in ('sparse_infill_density', 'skeleton_infill_density'):
+                elif key in INFILL_DENSITY_KEYS:
                     if obj_data['sparse_infill_density'] is None:
                         obj_data['sparse_infill_density'] = value
                     obj_data['custom_settings'][key] = value
@@ -240,10 +255,10 @@ class ThreeMFAnalyzer:
         
         diff_settings = self.project_settings.get('different_settings_to_system', [])
         if diff_settings and diff_settings[0]:
-            keys = diff_settings[0].split(';')
+            # Filter empty strings that result from split on empty or ";;"
+            keys = [k.strip() for k in diff_settings[0].split(';') if k.strip()]
             for key in keys:
-                key = key.strip()
-                if key and key in self.project_settings:
+                if key in self.project_settings:
                     value = self.project_settings[key]
                     if isinstance(value, list) and len(value) == 1:
                         value = value[0]
@@ -369,7 +384,7 @@ class ThreeMFAnalyzer:
                     'walls_custom': is_custom(obj.get('wall_loops'), profile['wall_loops']),
                     'infill': self._format_infill(obj_infill),
                     'infill_custom': is_custom(obj.get('sparse_infill_density'), profile['sparse_infill_density']),
-                    'support': 'On' if obj_support == '1' else 'Off',
+                    'support': 'On' if obj_support == BOOL_TRUE else 'Off',
                     'support_custom': is_custom(obj.get('enable_support'), profile['enable_support']),
                     'brim': self._format_brim(obj_brim),
                     'brim_custom': is_custom(obj.get('brim_type'), profile['brim_type']),
@@ -391,7 +406,7 @@ class ThreeMFAnalyzer:
                     
                     # Check for part-specific overrides (use part's custom value or inherit from parent)
                     part_infill = part_custom.get('sparse_infill_density') or part_custom.get('skeleton_infill_density') or obj_infill
-                    part_infill_custom = 'sparse_infill_density' in part_custom or 'skeleton_infill_density' in part_custom
+                    part_infill_custom = any(k in part_custom for k in INFILL_DENSITY_KEYS)
                     
                     part_walls = part_custom.get('wall_loops') or obj_walls
                     part_walls_custom = 'wall_loops' in part_custom
@@ -400,7 +415,7 @@ class ThreeMFAnalyzer:
                     part_speed_custom = 'outer_wall_speed' in part_custom
                     
                     # Inherit support from parent
-                    part_support = 'On' if obj_support == '1' else 'Off'
+                    part_support = 'On' if obj_support == BOOL_TRUE else 'Off'
                     
                     rows.append({
                         'plate': '',
@@ -520,7 +535,7 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     gs.add_row(wiki_label("Sparse Infill Density", "sparse_infill_density"), profile['sparse_infill_density'])
     gs.add_row(wiki_label("Top/Bottom Shell Layers", "top_shell_layers"), f"{profile['top_shell_layers']}/{profile['bottom_shell_layers']}")
     gs.add_row(wiki_label("Brim Type", "brim_type"), profile['brim_type'])
-    gs.add_row(wiki_label("Enable Support", "enable_support"), "On" if profile['enable_support'] == '1' else "Off")
+    gs.add_row(wiki_label("Enable Support", "enable_support"), "On" if profile['enable_support'] == BOOL_TRUE else "Off")
     gs.add_row(wiki_label("Seam Position", "seam_position"), profile['seam_position'])
     
     # -- Speeds --
@@ -541,7 +556,7 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     gs.add_row(wiki_label("Sparse Infill Pattern", "sparse_infill_pattern"), profile['sparse_infill_pattern'])
     gs.add_row(wiki_label("Top Surface Pattern", "top_surface_pattern"), profile['top_surface_pattern'])
     gs.add_row(wiki_label("Print Sequence", "print_sequence"), profile['print_sequence'])
-    if profile['spiral_mode'] == '1':
+    if profile['spiral_mode'] == BOOL_TRUE:
         gs.add_row(wiki_label("Spiral Mode (Vase)", "spiral_mode"), "[bright_green]ON[/bright_green]")
     if profile['ironing_type'] != 'no ironing':
         gs.add_row(wiki_label("Ironing Type", "ironing_type"), f"[bright_green]{profile['ironing_type']}[/bright_green]")
@@ -558,7 +573,7 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         gs.add_row(wiki_label("Pressure Advance", "pressure_advance"), profile['pressure_advance'])
     if profile['fan_min_speed'] or profile['fan_max_speed']:
         gs.add_row(wiki_label("Fan Min/Max Speed", "fan_min_speed"), f"{profile['fan_min_speed']}% / {profile['fan_max_speed']}%")
-    if profile['slow_down_for_layer_cooling'] == '1':
+    if profile['slow_down_for_layer_cooling'] == BOOL_TRUE:
         gs.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), f"[green]On[/green] ({profile['slow_down_layer_time']}s)")
     else:
         gs.add_row(wiki_label("Slow Down for Layer Cooling", "slow_down_for_layer_cooling"), "[dim]Off[/dim]")
@@ -571,9 +586,9 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     
     # -- Features --
     flags = []
-    if profile['enable_arc_fitting'] == '1':
+    if profile['enable_arc_fitting'] == BOOL_TRUE:
         flags.append('Enable Arc Fitting')
-    if profile['enable_overhang_speed'] == '1':
+    if profile['enable_overhang_speed'] == BOOL_TRUE:
         flags.append('Enable Overhang Speed')
     if profile['timelapse_type'] != '0':
         flags.append(f"Timelapse Type: {profile['timelapse_type']}")

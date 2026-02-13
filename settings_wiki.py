@@ -18,6 +18,7 @@ import hashlib
 import logging
 import re
 import sys
+import threading
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -46,7 +47,14 @@ _SOURCES = {
     },
 }
 
-_DATA_DIR = Path(__file__).parent / "data"
+def _get_data_dir() -> Path:
+    """Get data directory, supporting PyInstaller frozen executables."""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running as PyInstaller bundle
+        return Path(sys._MEIPASS) / "data"
+    return Path(__file__).parent / "data"
+
+_DATA_DIR = _get_data_dir()
 _JSON_PATH = _DATA_DIR / "settings_wiki.json"
 
 # Manual fallback wiki page mappings for settings that can't be automatically
@@ -471,35 +479,43 @@ def update(force: bool = False) -> bool:
 # Public API
 # ═══════════════════════════════════════════════════════════════
 
-# Module-level cache
+# Module-level cache with thread-safety
 _cache: Optional[dict] = None
+_cache_lock = threading.Lock()
 
 
 def _load_cache() -> dict:
-    """Load and cache settings_wiki.json."""
+    """Load and cache settings_wiki.json (thread-safe)."""
     global _cache
+    
+    # Fast path: cache already loaded (no lock needed)
     if _cache is not None:
         return _cache
-
-    if not _JSON_PATH.exists():
-        logger.debug("settings_wiki.json not found, building from .cpp files")
-        if (_DATA_DIR / "Tab.cpp").exists() and (_DATA_DIR / "PrintConfig.cpp").exists():
-            generate_json()
-        else:
-            logger.warning(
-                "No data files found. Run 'python settings_wiki.py' to download and generate."
-            )
-            _cache = {"_meta": {}, "settings": {}}
+    
+    with _cache_lock:
+        # Double-check after acquiring lock
+        if _cache is not None:
             return _cache
 
-    try:
-        with open(_JSON_PATH, 'r', encoding='utf-8') as f:
-            _cache = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        logger.error("Failed to load settings_wiki.json: %s", e)
-        _cache = {"_meta": {}, "settings": {}}
+        if not _JSON_PATH.exists():
+            logger.debug("settings_wiki.json not found, building from .cpp files")
+            if (_DATA_DIR / "Tab.cpp").exists() and (_DATA_DIR / "PrintConfig.cpp").exists():
+                generate_json()
+            else:
+                logger.warning(
+                    "No data files found. Run 'python settings_wiki.py' to download and generate."
+                )
+                _cache = {"_meta": {}, "settings": {}}
+                return _cache
 
-    return _cache
+        try:
+            with open(_JSON_PATH, 'r', encoding='utf-8') as f:
+                _cache = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error("Failed to load settings_wiki.json: %s", e)
+            _cache = {"_meta": {}, "settings": {}}
+
+        return _cache
 
 
 def get_wiki_url(setting_key: str) -> Optional[str]:
