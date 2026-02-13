@@ -132,9 +132,11 @@ def _parse_print_config(text: str) -> dict:
 
     # Tooltip can span multiple lines with string concatenation
     # First capture single-line tooltips, then handle multi-line
-    tooltip_single_pattern = re.compile(
+    # TODO: Use for optimized single-line tooltip extraction in future refactoring
+    _tooltip_single_pattern = re.compile(
         r'def->tooltip\s*=\s*L\("(.+?)"\);', re.DOTALL
     )
+    del _tooltip_single_pattern  # Silence pyflakes; pattern reserved for future use
 
     # Default value patterns
     default_patterns = [

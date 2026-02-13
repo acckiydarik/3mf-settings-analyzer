@@ -12,6 +12,7 @@ import pytest
 from settings_wiki import (
     _parse_print_config,
     _parse_tab_cpp,
+    _build_settings_data,
     update,
     _download_file,
     get_wiki_url,
@@ -569,6 +570,92 @@ class TestCLIUpdateWiki:
             
             # Should exit with error code
             assert exc_info.value.code == 1
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test _build_settings_data function
+# ═══════════════════════════════════════════════════════════════
+
+class TestBuildSettingsData:
+    """Tests for _build_settings_data function."""
+
+    def test_returns_empty_when_tab_cpp_missing(self, tmp_path: Path):
+        """Should return empty data when Tab.cpp is missing."""
+        with patch('settings_wiki._DATA_DIR', tmp_path):
+            result = _build_settings_data()
+            
+            assert result == {'_meta': {}, 'settings': {}}
+
+    def test_returns_empty_when_printconfig_cpp_missing(self, tmp_path: Path, sample_tab_cpp: str):
+        """Should return empty data when PrintConfig.cpp is missing."""
+        (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path):
+            result = _build_settings_data()
+            
+            assert result == {'_meta': {}, 'settings': {}}
+
+    def test_builds_settings_from_cpp_files(self, tmp_path: Path, sample_printconfig_cpp: str, sample_tab_cpp: str):
+        """Should parse and merge data from both .cpp files."""
+        (tmp_path / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
+        (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path):
+            result = _build_settings_data()
+        
+        assert '_meta' in result
+        assert 'settings' in result
+        assert len(result['settings']) > 0
+        # Check that layer_height was parsed from PrintConfig.cpp
+        assert 'layer_height' in result['settings']
+        assert result['settings']['layer_height']['label'] == 'Layer height'
+
+    def test_merges_wiki_pages_from_tab_cpp(self, tmp_path: Path, sample_printconfig_cpp: str, sample_tab_cpp: str):
+        """Should merge wiki_page from Tab.cpp into settings."""
+        (tmp_path / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
+        (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path):
+            result = _build_settings_data()
+        
+        # layer_height should have wiki_page from Tab.cpp
+        assert 'wiki_page' in result['settings']['layer_height']
+        assert result['settings']['layer_height']['wiki_page'] == 'quality_settings_layer_height'
+
+    def test_includes_meta_with_sha_and_counts(self, tmp_path: Path, sample_printconfig_cpp: str, sample_tab_cpp: str):
+        """_meta should include SHA hashes and setting counts."""
+        (tmp_path / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
+        (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path):
+            result = _build_settings_data()
+        
+        meta = result['_meta']
+        assert 'sha' in meta
+        assert 'Tab.cpp' in meta['sha']
+        assert 'PrintConfig.cpp' in meta['sha']
+        assert 'total_settings' in meta
+        assert 'with_wiki_page' in meta
+        assert meta['total_settings'] >= 1
+
+    def test_applies_wiki_fallbacks(self, tmp_path: Path, sample_printconfig_cpp: str, sample_tab_cpp: str):
+        """Should apply _WIKI_FALLBACKS for settings not in Tab.cpp."""
+        # Add a setting that has a fallback mapping
+        extended_printconfig = sample_printconfig_cpp + '''
+    def = this->add("bridge_speed", coFloat);
+    def->label = L("Bridge speed");
+    def->category = L("Speed");
+    def->set_default_value(new ConfigOptionFloat(25));
+'''
+        (tmp_path / 'PrintConfig.cpp').write_text(extended_printconfig)
+        (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
+        
+        with patch('settings_wiki._DATA_DIR', tmp_path):
+            result = _build_settings_data()
+        
+        # bridge_speed should have fallback wiki_page
+        assert 'bridge_speed' in result['settings']
+        assert 'wiki_page' in result['settings']['bridge_speed']
 
 
 # ═══════════════════════════════════════════════════════════════

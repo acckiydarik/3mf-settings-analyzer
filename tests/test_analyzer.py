@@ -13,6 +13,8 @@ import pytest
 from analyze import (
     ThreeMFAnalyzer,
     _is_custom,
+    _format_object_value,
+    _format_support_value,
     main,
     print_results,
     setup_logging,
@@ -362,6 +364,90 @@ class TestFormatFunctions:
         """_format_infill should handle various input types."""
         analyzer = ThreeMFAnalyzer(sample_3mf)
         assert analyzer._format_infill(input_val) == expected
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test _format_object_value function
+# ═══════════════════════════════════════════════════════════════
+
+class TestFormatObjectValue:
+    """Tests for _format_object_value helper function."""
+
+    def test_empty_value_returns_empty_string(self):
+        """Empty/None value should return empty string."""
+        assert _format_object_value(None, False, 'default', False) == ''
+        assert _format_object_value('', False, 'default', False) == ''
+        assert _format_object_value(0, False, 'default', False) == ''
+
+    def test_regular_value_no_custom(self):
+        """Non-custom value should return plain string."""
+        assert _format_object_value('10', False, '10', False) == '10'
+        assert _format_object_value(15, False, '15', False) == '15'
+
+    def test_custom_value_without_diff(self):
+        """Custom value without diff mode should show asterisk."""
+        result = _format_object_value('20', True, '10', False)
+        assert '*20' in result
+        assert 'bold yellow' in result
+        assert '←' not in result
+
+    def test_custom_value_with_diff(self):
+        """Custom value with diff mode should show asterisk and default."""
+        result = _format_object_value('20', True, '10', True)
+        assert '*20' in result
+        assert '←10' in result
+        assert 'bold yellow' in result
+
+    def test_custom_value_diff_no_default(self):
+        """Custom value with diff but no default should not show arrow."""
+        result = _format_object_value('20', True, None, True)
+        assert '*20' in result
+        assert '←' not in result
+
+    def test_custom_value_diff_empty_default(self):
+        """Custom value with empty default should not show arrow."""
+        result = _format_object_value('20', True, '', True)
+        assert '*20' in result
+        assert '←' not in result
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test _format_support_value function
+# ═══════════════════════════════════════════════════════════════
+
+class TestFormatSupportValue:
+    """Tests for _format_support_value helper function."""
+
+    def test_empty_value_returns_empty_string(self):
+        """Empty support value should return empty string."""
+        assert _format_support_value('', False) == ''
+        assert _format_support_value('', True) == ''
+
+    def test_support_on_not_custom(self):
+        """Support On (not custom) should be green."""
+        result = _format_support_value('On', False)
+        assert 'On' in result
+        assert 'green' in result
+        assert '*' not in result
+
+    def test_support_on_custom(self):
+        """Support On (custom) should show asterisk in yellow."""
+        result = _format_support_value('On', True)
+        assert '*On' in result
+        assert 'bold yellow' in result
+
+    def test_support_off_not_custom(self):
+        """Support Off (not custom) should be dim."""
+        result = _format_support_value('Off', False)
+        assert 'Off' in result
+        assert 'dim' in result
+        assert '*' not in result
+
+    def test_support_off_custom(self):
+        """Support Off (custom) should show asterisk in yellow."""
+        result = _format_support_value('Off', True)
+        assert '*Off' in result
+        assert 'bold yellow' in result
 
 
 # ═══════════════════════════════════════════════════════════════
