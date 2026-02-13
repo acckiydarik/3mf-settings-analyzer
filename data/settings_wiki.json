@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "updated": "2026-02-12 17:05 UTC",
+    "updated": "2026-02-13 09:52 UTC",
     "wiki_base": "https://github.com/OrcaSlicer/OrcaSlicer/wiki/",
     "sha": {
-      "Tab.cpp": "814e7e279da9",
+      "Tab.cpp": "37422fd44458",
       "PrintConfig.cpp": "b76d8a5c9f98"
     },
     "total_settings": 689,

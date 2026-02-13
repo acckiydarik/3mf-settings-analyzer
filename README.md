@@ -28,7 +28,7 @@ Works with 3MF files produced by:
 
 ### Prerequisites
 
-- Python 3.6+
+- Python 3.8+
 
 ### Installation
 
@@ -253,8 +253,9 @@ The analyzer reads `project_settings.config` for global/profile settings and `mo
 
 ## Requirements
 
-- Python 3.6+
+- Python 3.8+
 - [rich](https://github.com/Textualize/rich) >= 13.0.0
+- [defusedxml](https://github.com/tiran/defusedxml) >= 0.7.1 (recommended for XML security)
 
 ## Contributing
 

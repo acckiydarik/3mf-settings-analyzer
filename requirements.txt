@@ -1,1 +1,5 @@
+# 3MF Settings Analyzer dependencies
+# Python 3.8+ required
+
 rich>=13.0.0
+defusedxml>=0.7.1

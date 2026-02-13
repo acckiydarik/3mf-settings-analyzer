@@ -31,10 +31,28 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ═══════════════════════════════════════════════════════════════
 
-WIKI_BASE = "https://github.com/OrcaSlicer/OrcaSlicer/wiki/"
+import os
 
-_GITHUB_API_BASE = "https://api.github.com/repos/OrcaSlicer/OrcaSlicer/contents/src"
-_GITHUB_RAW_BASE = "https://raw.githubusercontent.com/OrcaSlicer/OrcaSlicer/main/src"
+# Wiki base URL - can be overridden via environment variable
+WIKI_BASE = os.environ.get(
+    "ORCASLICER_WIKI_BASE",
+    "https://github.com/OrcaSlicer/OrcaSlicer/wiki/"
+)
+
+# GitHub repository settings - can be overridden for forks or local development
+_GITHUB_REPO_OWNER = os.environ.get("ORCASLICER_REPO_OWNER", "OrcaSlicer")
+_GITHUB_REPO_NAME = os.environ.get("ORCASLICER_REPO_NAME", "OrcaSlicer")
+_GITHUB_BRANCH = os.environ.get("ORCASLICER_BRANCH", "main")
+
+_GITHUB_API_BASE = f"https://api.github.com/repos/{_GITHUB_REPO_OWNER}/{_GITHUB_REPO_NAME}/contents/src"
+_GITHUB_RAW_BASE = f"https://raw.githubusercontent.com/{_GITHUB_REPO_OWNER}/{_GITHUB_REPO_NAME}/{_GITHUB_BRANCH}/src"
+
+# Network timeout settings (in seconds)
+_API_TIMEOUT = int(os.environ.get("ORCASLICER_API_TIMEOUT", "10"))
+_DOWNLOAD_TIMEOUT = int(os.environ.get("ORCASLICER_DOWNLOAD_TIMEOUT", "30"))
+
+# SHA hash length for change detection
+_SHA_HASH_LENGTH = 12
 
 _SOURCES = {
     "Tab.cpp": {
@@ -308,8 +326,8 @@ def _build_settings_data() -> dict:
             settings[key] = {"wiki_page": wiki_page}
 
     # Compute file SHAs for change detection
-    tab_sha = hashlib.sha256(tab_text.encode()).hexdigest()[:12]
-    config_sha = hashlib.sha256(config_text.encode()).hexdigest()[:12]
+    tab_sha = hashlib.sha256(tab_text.encode()).hexdigest()[:_SHA_HASH_LENGTH]
+    config_sha = hashlib.sha256(config_text.encode()).hexdigest()[:_SHA_HASH_LENGTH]
 
     return {
         "_meta": {
@@ -339,7 +357,7 @@ def generate_json() -> Path:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
     meta = data["_meta"]
-    logger.info(
+    logger.debug(
         "Generated %s: %d settings (%d with wiki links)",
         _JSON_PATH.name,
         meta.get("total_settings", 0),
@@ -356,7 +374,7 @@ def _get_github_sha(api_url: str) -> Optional[str]:
     """Get file SHA from GitHub API without downloading content."""
     try:
         req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.v3+json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=_API_TIMEOUT) as resp:
             data = json.loads(resp.read().decode())
             return data.get("sha")
     except (urllib.error.URLError, json.JSONDecodeError, KeyError) as e:
@@ -365,16 +383,28 @@ def _get_github_sha(api_url: str) -> Optional[str]:
 
 
 def _download_file(raw_url: str, dest: Path) -> bool:
-    """Download a file from GitHub raw URL."""
+    """Download a file from GitHub raw URL.
+    
+    Args:
+        raw_url: URL to download from.
+        dest: Destination path to save the file.
+        
+    Returns:
+        True if download succeeded, False otherwise.
+    """
     try:
         req = urllib.request.Request(raw_url)
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
             content = resp.read()
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(content)
-            return True
+        # Write to file after closing the connection to avoid resource leak
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(content)
+        return True
     except urllib.error.URLError as e:
         logger.error("Failed to download %s: %s", raw_url, e)
+        return False
+    except OSError as e:
+        logger.error("Failed to write file %s: %s", dest, e)
         return False
 
 
@@ -407,7 +437,7 @@ def update(force: bool = False) -> bool:
     # Check if local files exist
     for filename in _SOURCES:
         if not (_DATA_DIR / filename).exists():
-            logger.info("Local file %s missing, downloading...", filename)
+            logger.debug("Local file %s missing, downloading...", filename)
             return _download_all_and_regenerate()
 
     # Compare remote content hash with stored hash
@@ -415,9 +445,9 @@ def update(force: bool = False) -> bool:
     for filename, urls in _SOURCES.items():
         try:
             req = urllib.request.Request(urls["raw_url"])
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
                 remote_content = resp.read()
-                remote_hash = hashlib.sha256(remote_content).hexdigest()[:12]
+                remote_hash = hashlib.sha256(remote_content).hexdigest()[:_SHA_HASH_LENGTH]
                 stored_hash = stored_hashes.get(filename, "")
                 
                 if remote_hash != stored_hash:
@@ -426,15 +456,15 @@ def update(force: bool = False) -> bool:
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     dest.write_bytes(remote_content)
                     needs_update = True
-                    logger.info("Updated %s (content changed)", filename)
+                    logger.debug("Updated %s (content changed)", filename)
                 else:
-                    logger.info("%s is up to date", filename)
+                    logger.debug("%s is up to date", filename)
         except urllib.error.URLError as e:
             logger.error("Failed to check %s: %s", filename, e)
             return False
 
     if not needs_update:
-        logger.info("Already up to date.")
+        logger.debug("All files up to date, no regeneration needed.")
         return False
 
     # Regenerate JSON with new content
@@ -448,7 +478,7 @@ def _download_all_and_regenerate() -> bool:
     all_ok = True
     for filename, urls in _SOURCES.items():
         dest = _DATA_DIR / filename
-        logger.info("Downloading %s...", filename)
+        logger.debug("Downloading %s...", filename)
         if not _download_file(urls["raw_url"], dest):
             all_ok = False
 
@@ -577,8 +607,19 @@ def main():
             sys.exit(1)
         path = generate_json()
         print(f"Generated: {path}")
-    else:
-        update(force=args.force)
+        sys.exit(0)
+    
+    try:
+        updated = update(force=args.force)
+        if updated:
+            print("Wiki data updated successfully.")
+            sys.exit(0)
+        else:
+            print("Wiki data is already up to date.")
+            sys.exit(0)
+    except Exception as e:
+        logger.error("Failed to update wiki data: %s", e)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

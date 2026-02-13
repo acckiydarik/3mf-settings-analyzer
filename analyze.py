@@ -5,11 +5,10 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 import zipfile
 import json
-import xml.etree.ElementTree as ET
 import tempfile
 import shutil
 import sys
@@ -17,6 +16,17 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+
+# Use defusedxml to prevent XXE attacks
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    # Fallback to standard library with warning
+    import xml.etree.ElementTree as ET
+    logging.getLogger(__name__).warning(
+        "defusedxml not installed. Using standard xml.etree.ElementTree. "
+        "Install defusedxml for protection against XML attacks: pip install defusedxml"
+    )
 
 from rich.console import Console
 from rich.table import Table
@@ -60,6 +70,15 @@ PLATE_COLORS = (
     'medium_purple1', 'gold1',
 )
 
+# Default extruder number (first extruder)
+DEFAULT_EXTRUDER = '1'
+
+# Fallback for sorting when identify_id is missing or invalid
+DEFAULT_IDENTIFY_ID = 0
+
+# 3MF file extension
+FILE_EXTENSION_3MF = '.3mf'
+
 
 # ═══════════════════════════════════════════════════════════════
 # Analyzer
@@ -93,6 +112,11 @@ class ThreeMFAnalyzer:
         
         Validates all paths in the archive to prevent path traversal attacks.
         Uses a temporary directory that will be cleaned up in _cleanup().
+        
+        Raises:
+            ValueError: If archive contains unsafe paths (Zip Slip attack).
+            zipfile.BadZipFile: If the file is not a valid ZIP archive.
+            OSError: If extraction fails due to filesystem issues.
         """
         self.temp_dir = Path(tempfile.mkdtemp())
         try:
@@ -108,12 +132,25 @@ class ThreeMFAnalyzer:
                     if not str(target_path).startswith(str(self.temp_dir.resolve())):
                         raise ValueError(f"Path traversal detected in archive: {member}")
                 z.extractall(self.temp_dir)
-        except Exception:
-            # Cleanup temp directory if extraction fails
-            if self.temp_dir and self.temp_dir.exists():
-                shutil.rmtree(self.temp_dir)
-            self.temp_dir = None
+        except zipfile.BadZipFile as e:
+            self._cleanup_on_error()
+            raise zipfile.BadZipFile(f"Invalid or corrupted 3MF file: {self.filepath}") from e
+        except ValueError:
+            # Re-raise security-related errors without wrapping
+            self._cleanup_on_error()
             raise
+        except OSError as e:
+            self._cleanup_on_error()
+            raise OSError(f"Failed to extract 3MF archive '{self.filepath}': {e}") from e
+        except Exception as e:
+            self._cleanup_on_error()
+            raise RuntimeError(f"Unexpected error extracting '{self.filepath}'") from e
+    
+    def _cleanup_on_error(self):
+        """Cleanup temp directory on extraction error."""
+        if self.temp_dir and self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+        self.temp_dir = None
     
     def _cleanup(self):
         """Cleanup temporary files"""
@@ -121,21 +158,34 @@ class ThreeMFAnalyzer:
             shutil.rmtree(self.temp_dir)
     
     def _parse_project_settings(self):
-        """Parse project_settings.config (JSON)"""
+        """Parse project_settings.config (JSON).
+        
+        Raises:
+            json.JSONDecodeError: If the config file contains invalid JSON.
+            OSError: If the file cannot be read.
+        """
         config_path = self.temp_dir / "Metadata" / "project_settings.config"
         if config_path.exists():
             logger.debug("Parsing project settings from: %s", config_path)
             try:
                 with open(config_path, 'r', encoding='utf-8', errors='replace') as f:
                     self.project_settings = json.load(f)
-            except UnicodeDecodeError as e:
-                logger.error("Encoding error reading project settings: %s", e)
-                raise
+            except json.JSONDecodeError as e:
+                raise json.JSONDecodeError(
+                    f"Invalid JSON in project_settings.config: {e.msg}",
+                    e.doc, e.pos
+                ) from e
+            except OSError as e:
+                raise OSError(f"Failed to read project settings: {config_path}") from e
         else:
             logger.warning("Project settings file not found: %s", config_path)
     
     def _parse_model_settings(self):
-        """Parse model_settings.config (XML)"""
+        """Parse model_settings.config (XML).
+        
+        Raises:
+            ET.ParseError: If the config file contains invalid XML.
+        """
         config_path = self.temp_dir / "Metadata" / "model_settings.config"
         if not config_path.exists():
             logger.warning("Model settings file not found: %s", config_path)
@@ -147,8 +197,7 @@ class ThreeMFAnalyzer:
             tree = ET.parse(config_path)
             root = tree.getroot()
         except ET.ParseError as e:
-            logger.error("Invalid XML in model_settings.config: %s", e)
-            raise
+            raise ET.ParseError(f"Invalid XML in model_settings.config: {e}") from e
         
         # Validate root element
         if root.tag != 'config':
@@ -160,7 +209,7 @@ class ThreeMFAnalyzer:
             
             obj_data = {
                 'name': None,
-                'extruder': '1',
+                'extruder': DEFAULT_EXTRUDER,
                 'layer_height': None,
                 'wall_loops': None,
                 'sparse_infill_density': None,
@@ -253,7 +302,7 @@ class ThreeMFAnalyzer:
                         try:
                             identify_id = int(value)
                         except (ValueError, TypeError):
-                            identify_id = 0
+                            identify_id = DEFAULT_IDENTIFY_ID
                 if obj_id:
                     plate_objects.append({'object_id': obj_id, 'identify_id': identify_id})
             
@@ -310,16 +359,16 @@ class ThreeMFAnalyzer:
             'process': self.project_settings.get('print_settings_id', 'Unknown'),
             'filaments': self.project_settings.get('filament_settings_id', ['Unknown']),
             # Basic settings
-            'layer_height': self._get_value('layer_height', '0.2'),
+            'layer_height': self._get_value('layer_height', ''),
             'initial_layer_print_height': self._get_value('initial_layer_print_height', ''),
-            'nozzle': self._get_value('nozzle_diameter', '0.4'),
+            'nozzle': self._get_value('nozzle_diameter', ''),
             'line_width': self._get_value('line_width', ''),
-            'wall_loops': self._get_value('wall_loops', '2'),
-            'sparse_infill_density': self._get_value('sparse_infill_density', '15%'),
-            'brim_type': self._get_value('brim_type', 'no_brim'),
-            'enable_support': self._get_value('enable_support', '0'),
+            'wall_loops': self._get_value('wall_loops', ''),
+            'sparse_infill_density': self._get_value('sparse_infill_density', ''),
+            'brim_type': self._get_value('brim_type', ''),
+            'enable_support': self._get_value('enable_support', ''),
             # Flow
-            'print_flow_ratio': self._get_value('print_flow_ratio', '1'),
+            'print_flow_ratio': self._get_value('print_flow_ratio', ''),
             'filament_flow_ratio': self._get_value('filament_flow_ratio', ''),
             # Speeds
             'initial_layer_speed': self._get_value('initial_layer_speed', ''),
@@ -402,7 +451,7 @@ class ThreeMFAnalyzer:
                 obj_support = obj.get('enable_support') or profile['enable_support']
                 obj_brim = obj.get('brim_type') or profile['brim_type']
                 obj_speed = obj.get('outer_wall_speed') or profile['outer_wall_speed']
-                obj_extruder = obj.get('extruder', '1')
+                obj_extruder = obj.get('extruder', DEFAULT_EXTRUDER)
                 
                 def is_custom(obj_val, global_val):
                     if obj_val is None:
@@ -816,7 +865,19 @@ Examples:
     # Handle wiki update commands (no file required)
     if args.update_wiki or args.force_update_wiki:
         from settings_wiki import update as wiki_update
-        wiki_update(force=args.force_update_wiki)
+        console = Console(no_color=args.no_color)
+        console.print("[cyan]Updating wiki data from OrcaSlicer GitHub...[/cyan]")
+        try:
+            updated = wiki_update(force=args.force_update_wiki)
+            if updated:
+                console.print("[green]Wiki data updated successfully.[/green]")
+            else:
+                console.print("[yellow]Wiki data is already up to date.[/yellow]")
+        except Exception as e:
+            logger.error("Failed to update wiki data: %s", e)
+            console.print(f"[red]Failed to update wiki data: {e}[/red]")
+            if not args.file:
+                sys.exit(1)
         if not args.file:
             sys.exit(0)
     
@@ -829,7 +890,7 @@ Examples:
         logger.error("File not found: %s", filepath)
         sys.exit(1)
     
-    if filepath.suffix.lower() != '.3mf':
+    if filepath.suffix.lower() != FILE_EXTENSION_3MF:
         logger.warning("File does not have .3mf extension: %s", filepath)
     
     try:
