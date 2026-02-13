@@ -106,7 +106,7 @@ python3 analyze.py --update-wiki
 
 The analyzer produces several sections. Here is a full example:
 
-```
+```text
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ 3MF SETTINGS ANALYZER  │  example.3mf                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
@@ -214,7 +214,7 @@ Custom values are marked with `*`. Per-object overrides (ironing, infill density
 
 With `--diff`, custom values show the original default alongside:
 
-```
+```text
 │  *80 <-15%  │  *On <-Off  │
 ```
 
@@ -222,7 +222,7 @@ With `--diff`, custom values show the original default alongside:
 
 A `.3mf` file is a ZIP archive with the following structure relevant to this tool:
 
-```
+```text
 file.3mf
 ├── Metadata/
 │   ├── project_settings.config   <- global print settings (JSON)
@@ -236,10 +236,14 @@ The analyzer reads `project_settings.config` for global/profile settings and `mo
 
 ## Project Structure
 
-```
+```text
 3mf-settings-analyzer/
 ├── analyze.py          # Main CLI script
 ├── settings_wiki.py    # OrcaSlicer settings reference module
+├── tests/              # Unit tests
+│   ├── conftest.py         # Pytest fixtures
+│   ├── test_analyzer.py    # Tests for analyze.py
+│   └── test_settings_wiki.py  # Tests for settings_wiki.py
 ├── data/
 │   ├── PrintConfig.cpp     # OrcaSlicer source (setting definitions)
 │   ├── Tab.cpp             # OrcaSlicer source (wiki page mappings)
@@ -253,13 +257,25 @@ The analyzer reads `project_settings.config` for global/profile settings and `mo
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.9+
 - [rich](https://github.com/Textualize/rich) >= 13.0.0
 - [defusedxml](https://github.com/tiran/defusedxml) >= 0.7.1 (recommended for XML security)
+- [pytest](https://docs.pytest.org/) >= 7.0.0 (for development/testing)
 
 ## Contributing
 
 Contributions are welcome. If you found a bug or have a feature request, please [open an issue](https://github.com/acckiydarik/3mf-settings-analyzer/issues). Pull requests are also appreciated.
+
+## Development
+
+### Running Tests
+
+Install development dependencies and run the test suite:
+
+```bash
+pip install -r requirements.txt
+pytest tests/ -v
+```
 
 ## License
 

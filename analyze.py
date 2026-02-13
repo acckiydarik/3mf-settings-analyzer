@@ -5,7 +5,7 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 import zipfile
 import json
@@ -15,7 +15,7 @@ import sys
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Callable, Tuple, Union
 
 # Use defusedxml to prevent XXE attacks
 try:
@@ -84,10 +84,17 @@ FILE_EXTENSION_3MF = '.3mf'
 # Analyzer
 # ═══════════════════════════════════════════════════════════════
 
+def _is_custom(obj_val: Any, global_val: Any) -> bool:
+    """Check if object value differs from global profile value."""
+    if obj_val is None:
+        return False
+    return str(obj_val) != str(global_val)
+
+
 class ThreeMFAnalyzer:
     """Analyzes 3MF files and extracts slicer settings."""
     
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: Union[str, Path]):
         self.filepath = Path(filepath)
         self.temp_dir: Optional[Path] = None
         self.project_settings: Dict = {}
@@ -129,7 +136,7 @@ class ThreeMFAnalyzer:
                         raise ValueError(f"Unsafe absolute path in archive: {member}")
                     # Resolve and check if path stays within temp_dir
                     target_path = (self.temp_dir / member).resolve()
-                    if not str(target_path).startswith(str(self.temp_dir.resolve())):
+                    if not target_path.is_relative_to(self.temp_dir.resolve()):
                         raise ValueError(f"Path traversal detected in archive: {member}")
                 z.extractall(self.temp_dir)
         except zipfile.BadZipFile as e:
@@ -430,7 +437,8 @@ class ThreeMFAnalyzer:
         }
         return mapping.get(brim_type, brim_type)
     
-    def _format_infill(self, value):
+    def _format_infill(self, value: Any) -> str:
+        """Format infill density value, removing % sign if present."""
         if value is None:
             return ''
         return str(value).replace('%', '')
@@ -456,11 +464,6 @@ class ThreeMFAnalyzer:
                 obj_speed = obj.get('outer_wall_speed') or profile['outer_wall_speed']
                 obj_extruder = obj.get('extruder', DEFAULT_EXTRUDER)
                 
-                def is_custom(obj_val, global_val):
-                    if obj_val is None:
-                        return False
-                    return str(obj_val) != str(global_val)
-                
                 rows.append({
                     'plate': plate_num,
                     'name': obj_name,
@@ -468,17 +471,17 @@ class ThreeMFAnalyzer:
                     'is_part': False,
                     'filament': obj_extruder,
                     'layer_height': obj_layer,
-                    'layer_custom': is_custom(obj.get('layer_height'), profile['layer_height']),
+                    'layer_custom': _is_custom(obj.get('layer_height'), profile['layer_height']),
                     'wall_loops': obj_walls,
-                    'walls_custom': is_custom(obj.get('wall_loops'), profile['wall_loops']),
+                    'walls_custom': _is_custom(obj.get('wall_loops'), profile['wall_loops']),
                     'infill': self._format_infill(obj_infill),
-                    'infill_custom': is_custom(obj.get('sparse_infill_density'), profile['sparse_infill_density']),
+                    'infill_custom': _is_custom(obj.get('sparse_infill_density'), profile['sparse_infill_density']),
                     'support': 'On' if obj_support == BOOL_TRUE else 'Off',
-                    'support_custom': is_custom(obj.get('enable_support'), profile['enable_support']),
+                    'support_custom': _is_custom(obj.get('enable_support'), profile['enable_support']),
                     'brim': self._format_brim(obj_brim),
-                    'brim_custom': is_custom(obj.get('brim_type'), profile['brim_type']),
+                    'brim_custom': _is_custom(obj.get('brim_type'), profile['brim_type']),
                     'outer_wall_speed': obj_speed,
-                    'speed_custom': is_custom(obj.get('outer_wall_speed'), profile['outer_wall_speed']),
+                    'speed_custom': _is_custom(obj.get('outer_wall_speed'), profile['outer_wall_speed']),
                     'custom_settings': obj.get('custom_settings', {}),
                 })
                 
@@ -540,11 +543,14 @@ class ThreeMFAnalyzer:
 # Output
 # ═══════════════════════════════════════════════════════════════
 
-def _make_wiki_helpers(enabled: bool):
+def _make_wiki_helpers(enabled: bool) -> Tuple[Callable[[str, str], str], Callable[[str], str]]:
     """Create wiki_label and wiki_key helpers based on --wiki flag.
 
     When disabled, returns no-op passthrough functions to avoid
     importing settings_wiki module entirely.
+    
+    Returns:
+        Tuple of (wiki_label, wiki_key) callable functions.
     """
     if not enabled:
         return (
