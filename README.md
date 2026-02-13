@@ -57,7 +57,7 @@ python3 analyze.py <file.3mf> [options]
 | `-h`, `--help` | Show help message and exit |
 | `--version` | Show version number and exit |
 | `--diff` | Show comparison of custom values against profile defaults |
-| `--json` | Output raw JSON data |
+| `--json` | Output JSON only (no formatted tables) |
 | `-w`, `--wiki` | Add clickable wiki links to setting names (Cmd/Ctrl+click in terminal) |
 | `--no-color` | Disable colored output (useful for file redirection) |
 | `-v`, `--verbose` | Enable debug logging |
@@ -78,7 +78,7 @@ Show differences between custom and default values:
 python3 analyze.py model.3mf --diff
 ```
 
-Export structured data as JSON:
+Export structured data as JSON (tables are suppressed):
 
 ```bash
 python3 analyze.py model.3mf --json

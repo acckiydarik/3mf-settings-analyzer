@@ -5,7 +5,7 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 import zipfile
 import json
@@ -89,10 +89,31 @@ class ThreeMFAnalyzer:
             self._cleanup()
     
     def _extract(self):
-        """Extract 3MF archive"""
+        """Extract 3MF archive with Zip Slip protection.
+        
+        Validates all paths in the archive to prevent path traversal attacks.
+        Uses a temporary directory that will be cleaned up in _cleanup().
+        """
         self.temp_dir = Path(tempfile.mkdtemp())
-        with zipfile.ZipFile(self.filepath, 'r') as z:
-            z.extractall(self.temp_dir)
+        try:
+            with zipfile.ZipFile(self.filepath, 'r') as z:
+                # Zip Slip protection: validate all paths before extraction
+                for member in z.namelist():
+                    member_path = Path(member)
+                    # Check for absolute paths or path traversal
+                    if member_path.is_absolute():
+                        raise ValueError(f"Unsafe absolute path in archive: {member}")
+                    # Resolve and check if path stays within temp_dir
+                    target_path = (self.temp_dir / member).resolve()
+                    if not str(target_path).startswith(str(self.temp_dir.resolve())):
+                        raise ValueError(f"Path traversal detected in archive: {member}")
+                z.extractall(self.temp_dir)
+        except Exception:
+            # Cleanup temp directory if extraction fails
+            if self.temp_dir and self.temp_dir.exists():
+                shutil.rmtree(self.temp_dir)
+            self.temp_dir = None
+            raise
     
     def _cleanup(self):
         """Cleanup temporary files"""
@@ -104,8 +125,12 @@ class ThreeMFAnalyzer:
         config_path = self.temp_dir / "Metadata" / "project_settings.config"
         if config_path.exists():
             logger.debug("Parsing project settings from: %s", config_path)
-            with open(config_path, 'r', encoding='utf-8') as f:
-                self.project_settings = json.load(f)
+            try:
+                with open(config_path, 'r', encoding='utf-8', errors='replace') as f:
+                    self.project_settings = json.load(f)
+            except UnicodeDecodeError as e:
+                logger.error("Encoding error reading project settings: %s", e)
+                raise
         else:
             logger.warning("Project settings file not found: %s", config_path)
     
@@ -242,11 +267,23 @@ class ThreeMFAnalyzer:
                     'objects': [obj['object_id'] for obj in plate_objects]
                 })
     
-    def _get_value(self, key: str, default=None):
-        """Get value from project_settings"""
+    def _get_value(self, key: str, default=None, index: int = 0):
+        """Get value from project_settings.
+        
+        Args:
+            key: Setting key to retrieve.
+            default: Default value if key not found.
+            index: Which element to return for list values.
+                   0 = first element (default), -1 = entire list.
+        
+        Returns:
+            The setting value, or default if not found.
+        """
         val = self.project_settings.get(key, default)
-        if isinstance(val, list) and len(val) >= 1:
-            return val[0]
+        if isinstance(val, list):
+            if index == -1:
+                return val  # Return entire list
+            return val[index] if len(val) > index else default
         return val
     
     def _get_custom_global_settings(self) -> Dict[str, Any]:
@@ -464,20 +501,23 @@ def _make_wiki_helpers(enabled: bool):
         )
 
     from settings_wiki import get_wiki_url
+    from rich.markup import escape
 
     def wiki_label(display_name: str, setting_key: str) -> str:
         """Wrap display_name in a Rich hyperlink to the OrcaSlicer wiki page."""
         url = get_wiki_url(setting_key)
+        safe_name = escape(display_name)
         if url:
-            return f"[link={url}]{display_name}[/link]"
-        return display_name
+            return f"[link={url}]{safe_name}[/link]"
+        return safe_name
 
     def wiki_key(setting_key: str) -> str:
         """Wrap a raw setting key in a Rich hyperlink to the wiki page."""
         url = get_wiki_url(setting_key)
+        safe_key = escape(setting_key)
         if url:
-            return f"[link={url}]{setting_key}[/link]"
-        return setting_key
+            return f"[link={url}]{safe_key}[/link]"
+        return safe_key
 
     return wiki_label, wiki_key
 
@@ -755,7 +795,7 @@ Examples:
     parser.add_argument('--diff', action='store_true', 
                         help='Show comparison with global settings')
     parser.add_argument('--json', action='store_true',
-                        help='Output raw JSON data')
+                        help='Output JSON only (no formatted tables)')
     parser.add_argument('--no-color', action='store_true',
                         help='Disable colored output (for Rich library)')
     parser.add_argument('--wiki', '-w', action='store_true',
@@ -795,11 +835,12 @@ Examples:
     try:
         analyzer = ThreeMFAnalyzer(str(filepath))
         result = analyzer.analyze()
-        print_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
         
         if args.json:
-            print("\n--- JSON OUTPUT ---")
+            # JSON-only output for scripting/automation
             print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            print_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
             
     except zipfile.BadZipFile:
         logger.error("Invalid or corrupted ZIP/3MF file: %s", filepath)

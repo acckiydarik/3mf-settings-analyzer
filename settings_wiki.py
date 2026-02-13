@@ -381,98 +381,82 @@ def _download_file(raw_url: str, dest: Path) -> bool:
 def update(force: bool = False) -> bool:
     """Check for updates and re-download .cpp files if changed.
 
+    Uses SHA256 content hashing to detect changes. Downloads remote files
+    and compares their hash against locally stored hashes.
+
     Args:
-        force: If True, skip SHA check and always re-download.
+        force: If True, skip hash check and always re-download.
 
     Returns:
         True if files were updated, False if already up to date or error.
     """
-    # Load existing SHAs for comparison
-    existing_shas = {}
-    if not force and _JSON_PATH.exists():
+    if force:
+        # Force mode: skip all checks, download everything
+        return _download_all_and_regenerate()
+
+    # Load existing content hashes for comparison
+    stored_hashes = {}
+    if _JSON_PATH.exists():
         try:
             with open(_JSON_PATH, 'r', encoding='utf-8') as f:
                 existing_data = json.load(f)
-                existing_shas = existing_data.get("_meta", {}).get("sha", {})
+                stored_hashes = existing_data.get("_meta", {}).get("sha", {})
         except (json.JSONDecodeError, KeyError):
             pass
 
-    # Check each source file
-    needs_update = force
-    if not force:
-        for filename, urls in _SOURCES.items():
-            remote_sha = _get_github_sha(urls["api_url"])
-            if remote_sha is None:
-                logger.warning("Could not check %s, will re-download.", filename)
-                needs_update = True
-                break
+    # Check if local files exist
+    for filename in _SOURCES:
+        if not (_DATA_DIR / filename).exists():
+            logger.info("Local file %s missing, downloading...", filename)
+            return _download_all_and_regenerate()
 
-            local_path = _DATA_DIR / filename
-            if not local_path.exists():
-                needs_update = True
-                break
-
-            # GitHub API returns git blob SHA, we store content SHA.
-            # So we compare by re-downloading if API SHA differs from what
-            # we've seen before. For simplicity, always compare local content hash.
-            local_sha = hashlib.sha256(local_path.read_bytes()).hexdigest()[:12]
-            stored_sha = existing_shas.get(filename, "")
-            if local_sha != stored_sha:
-                needs_update = True
-                break
-
-    if not needs_update:
-        # Quick check: do the files exist on disk?
-        for filename in _SOURCES:
-            if not (_DATA_DIR / filename).exists():
-                needs_update = True
-                break
-
-    if not needs_update and not force:
-        # Download to temp and compare content hashes
-        for filename, urls in _SOURCES.items():
-            try:
-                req = urllib.request.Request(urls["raw_url"])
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    remote_content = resp.read()
-                    remote_hash = hashlib.sha256(remote_content).hexdigest()[:12]
-                    stored_sha = existing_shas.get(filename, "")
-                    if remote_hash != stored_sha:
-                        # Content changed, save and mark for update
-                        dest = _DATA_DIR / filename
-                        dest.parent.mkdir(parents=True, exist_ok=True)
-                        dest.write_bytes(remote_content)
-                        needs_update = True
-                        logger.info("Updated %s (content changed)", filename)
-                    else:
-                        logger.info("%s is up to date", filename)
-            except urllib.error.URLError as e:
-                logger.error("Failed to check %s: %s", filename, e)
-                return False
-
-        if not needs_update:
-            print("Already up to date.")
+    # Compare remote content hash with stored hash
+    needs_update = False
+    for filename, urls in _SOURCES.items():
+        try:
+            req = urllib.request.Request(urls["raw_url"])
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                remote_content = resp.read()
+                remote_hash = hashlib.sha256(remote_content).hexdigest()[:12]
+                stored_hash = stored_hashes.get(filename, "")
+                
+                if remote_hash != stored_hash:
+                    # Content changed, save file
+                    dest = _DATA_DIR / filename
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(remote_content)
+                    needs_update = True
+                    logger.info("Updated %s (content changed)", filename)
+                else:
+                    logger.info("%s is up to date", filename)
+        except urllib.error.URLError as e:
+            logger.error("Failed to check %s: %s", filename, e)
             return False
 
-        # Regenerate JSON
-        generate_json()
-        return True
+    if not needs_update:
+        logger.info("Already up to date.")
+        return False
 
-    # Force or needs update: download all files
+    # Regenerate JSON with new content
+    generate_json()
+    return True
+
+
+def _download_all_and_regenerate() -> bool:
+    """Download all source files and regenerate JSON."""
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
     all_ok = True
     for filename, urls in _SOURCES.items():
         dest = _DATA_DIR / filename
-        print(f"Downloading {filename}...")
+        logger.info("Downloading %s...", filename)
         if not _download_file(urls["raw_url"], dest):
             all_ok = False
 
     if all_ok:
         generate_json()
-        return True
     else:
         logger.error("Some downloads failed. JSON not regenerated.")
-        return False
+    return all_ok
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -513,6 +497,10 @@ def _load_cache() -> dict:
                 _cache = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             logger.error("Failed to load settings_wiki.json: %s", e)
+            logger.warning(
+                "Wiki links will be unavailable. "
+                "Run 'python analyze.py --update-wiki' to fix."
+            )
             _cache = {"_meta": {}, "settings": {}}
 
         return _cache
