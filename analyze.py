@@ -5,7 +5,7 @@ Analyzes 3MF files and displays slicer settings in a structured table format.
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
 """
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 import zipfile
 import json
@@ -197,7 +197,10 @@ class ThreeMFAnalyzer:
             tree = ET.parse(config_path)
             root = tree.getroot()
         except ET.ParseError as e:
-            raise ET.ParseError(f"Invalid XML in model_settings.config: {e}") from e
+            # ET.ParseError inherits from SyntaxError and doesn't accept custom messages.
+            # Log context and re-raise the original exception.
+            logger.error("Invalid XML in model_settings.config: %s", e)
+            raise
         
         # Validate root element
         if root.tag != 'config':
@@ -571,23 +574,12 @@ def _make_wiki_helpers(enabled: bool):
     return wiki_label, wiki_key
 
 
-def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: bool = False, wiki: bool = False):
-    """Format and display analysis results using Rich tables."""
-    
-    wiki_label, wiki_key = _make_wiki_helpers(wiki)
-    console = Console(no_color=no_color)
-    profile = result['profile']
-    profile_full = result.get('profile_full', {})
-    
-    # ═══════════════════════════════════════════════════════════
-    # HEADER
-    # ═══════════════════════════════════════════════════════════
-    console.print(Panel(f"[bold cyan]3MF SETTINGS ANALYZER[/bold cyan]  │  {result['file']}", 
+def _print_header(console: Console, filename: str):
+    console.print(Panel(f"[bold cyan]3MF SETTINGS ANALYZER[/bold cyan]  │  {filename}", 
                         border_style="cyan"))
-    
-    # ═══════════════════════════════════════════════════════════
-    # PROFILE
-    # ═══════════════════════════════════════════════════════════
+
+
+def _print_profile_panel(console: Console, profile: Dict[str, Any]):
     profile_table = Table(show_header=False, box=None, padding=(0, 2))
     profile_table.add_column("Key", style="dim")
     profile_table.add_column("Value")
@@ -602,10 +594,9 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     
     console.print(Panel(profile_table, title="[bold bright_yellow]PROFILE[/bold bright_yellow]",
                         border_style="grey50", box=box.ROUNDED))
-    
-    # ═══════════════════════════════════════════════════════════
-    # GLOBAL SETTINGS (single merged table with section dividers)
-    # ═══════════════════════════════════════════════════════════
+
+
+def _print_global_settings(console: Console, profile: Dict[str, Any], wiki_label):
     gs = Table(show_header=False, box=None, padding=(0, 2))
     gs.add_column("Key", style="dim")
     gs.add_column("Value", style="white")
@@ -687,25 +678,47 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     
     console.print(Panel(gs, title="[bold bright_yellow]GLOBAL SETTINGS[/bold bright_yellow]",
                         border_style="grey50", box=box.ROUNDED))
-    
-    # ═══════════════════════════════════════════════════════════
-    # CUSTOM GLOBAL
-    # ═══════════════════════════════════════════════════════════
-    custom = result['custom_global']
-    if custom:
-        custom_table = Table(show_header=False, box=None, padding=(0, 2))
-        custom_table.add_column("Key", style="yellow")
-        custom_table.add_column("Value", style="white")
-        for k, v in custom.items():
-            custom_table.add_row(f"✎ {wiki_key(k)}", escape(str(v)))
-        console.print(Panel(custom_table,
-                            title="[bold bright_red]CUSTOM GLOBAL SETTINGS[/bold bright_red] [grey50](changed from profile)[/grey50]",
-                            border_style="grey50", box=box.ROUNDED))
-    
-    # ═══════════════════════════════════════════════════════════
-    # OBJECTS TABLE
-    # ═══════════════════════════════════════════════════════════
-    rows = result['rows']
+
+
+def _print_custom_global(console: Console, custom: Dict[str, Any], wiki_key):
+    if not custom:
+        return
+    custom_table = Table(show_header=False, box=None, padding=(0, 2))
+    custom_table.add_column("Key", style="yellow")
+    custom_table.add_column("Value", style="white")
+    for k, v in custom.items():
+        custom_table.add_row(f"✎ {wiki_key(k)}", escape(str(v)))
+    console.print(Panel(custom_table,
+                        title="[bold bright_red]CUSTOM GLOBAL SETTINGS[/bold bright_red] [grey50](changed from profile)[/grey50]",
+                        border_style="grey50", box=box.ROUNDED))
+
+
+def _format_object_value(val, is_custom: bool, default, show_diff: bool) -> str:
+    if not val:
+        return ""
+    s = str(val)
+    if is_custom and default and show_diff:
+        return f"[bold yellow]*{s}[/bold yellow] [dim]←{default}[/dim]"
+    elif is_custom:
+        return f"[bold yellow]*{s}[/bold yellow]"
+    return s
+
+
+def _format_support_value(support: str, is_custom: bool) -> str:
+    if support == '':
+        return ""
+    elif support == 'On':
+        if is_custom:
+            return "[bold yellow]*On[/bold yellow]"
+        return "[green]On[/green]"
+    else:
+        if is_custom:
+            return "[bold yellow]*Off[/bold yellow]"
+        return "[dim]Off[/dim]"
+
+
+def _print_objects_table(console: Console, rows: List[Dict], profile: Dict[str, Any],
+                         profile_full: Dict[str, Any], show_diff: bool, wiki_key):
     if not rows:
         console.print("\n[red]No objects found[/red]")
         return
@@ -725,7 +738,6 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
     
     current_plate = None
     for row in rows:
-        # Format values
         plate_num = str(row['plate']) if row['plate'] else ""
         name = row['name']
         fil = row['filament']
@@ -733,11 +745,9 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         # Separators
         if row['is_parent'] and current_plate is not None:
             if plate_num and plate_num != current_plate:
-                # Different plate - double section (more visible)
                 table.add_section()
                 table.add_section()
             else:
-                # Same plate, different object - single section
                 table.add_section()
         if plate_num:
             current_plate = plate_num
@@ -755,34 +765,12 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
         fil_color = FILAMENT_COLORS[(fil_num - 1) % len(FILAMENT_COLORS)] if fil_num > 0 else 'white'
         fil_styled = f"[{fil_color}]{fil}[/{fil_color}]" if fil else ""
         
-        def fmt_val(val, is_custom, default=None):
-            if not val:
-                return ""
-            s = str(val)
-            if is_custom and default and show_diff:
-                return f"[bold yellow]*{s}[/bold yellow] [dim]←{default}[/dim]"
-            elif is_custom:
-                return f"[bold yellow]*{s}[/bold yellow]"
-            return s
-        
-        layer = fmt_val(row['layer_height'], row['layer_custom'], profile['layer_height'])
-        walls = fmt_val(row['wall_loops'], row['walls_custom'], profile['wall_loops'])
-        infill = fmt_val(row['infill'], row['infill_custom'], profile['sparse_infill_density'])
-        # Support with custom highlighting (empty for parts)
-        if row['support'] == '':
-            support = ""
-        elif row['support'] == 'On':
-            if row['support_custom']:
-                support = "[bold yellow]*On[/bold yellow]"
-            else:
-                support = "[green]On[/green]"
-        else:
-            if row['support_custom']:
-                support = "[bold yellow]*Off[/bold yellow]"
-            else:
-                support = "[dim]Off[/dim]"
-        brim = fmt_val(row['brim'], row['brim_custom'], profile['brim_type'])
-        speed = fmt_val(row['outer_wall_speed'], row['speed_custom'], profile['outer_wall_speed'])
+        layer = _format_object_value(row['layer_height'], row['layer_custom'], profile['layer_height'], show_diff)
+        walls = _format_object_value(row['wall_loops'], row['walls_custom'], profile['wall_loops'], show_diff)
+        infill = _format_object_value(row['infill'], row['infill_custom'], profile['sparse_infill_density'], show_diff)
+        support = _format_support_value(row['support'], row['support_custom'])
+        brim = _format_object_value(row['brim'], row['brim_custom'], profile['brim_type'], show_diff)
+        speed = _format_object_value(row['outer_wall_speed'], row['speed_custom'], profile['outer_wall_speed'], show_diff)
         
         # Name style
         if row['is_parent']:
@@ -799,21 +787,31 @@ def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: boo
             for idx, (key, value) in enumerate(settings_items):
                 is_last = (idx == len(settings_items) - 1)
                 branch = "└─" if is_last else "├─"
-                # Look for default value in full profile
                 default_val = profile_full.get(key, '')
                 linked_key = wiki_key(key)
                 if show_diff and default_val and str(default_val) != str(value):
                     setting_name = f"    [dim]{branch}[/dim] [yellow]{linked_key}: {value}[/yellow] [dim]←{default_val}[/dim]"
                 else:
                     setting_name = f"    [dim]{branch}[/dim] [yellow]{linked_key}: {value}[/yellow]"
-                # Empty row with setting only in Name column
                 table.add_row("", setting_name, "", "", "", "", "", "", "")
     
     console.print(table)
-    
-    # Legend
     console.print("[bold yellow]*[/bold yellow] = custom value (overrides profile default)")
     print()
+
+
+def print_results(result: Dict[str, Any], show_diff: bool = False, no_color: bool = False, wiki: bool = False):
+    """Format and display analysis results using Rich tables."""
+    wiki_label, wiki_key = _make_wiki_helpers(wiki)
+    console = Console(no_color=no_color)
+    profile = result['profile']
+    profile_full = result.get('profile_full', {})
+    
+    _print_header(console, result['file'])
+    _print_profile_panel(console, profile)
+    _print_global_settings(console, profile, wiki_label)
+    _print_custom_global(console, result['custom_global'], wiki_key)
+    _print_objects_table(console, result['rows'], profile, profile_full, show_diff, wiki_key)
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -912,9 +910,17 @@ Examples:
     except ET.ParseError as e:
         logger.error("Failed to parse model settings (invalid XML): %s", e)
         sys.exit(1)
-    except Exception as e:
-        logger.exception("Unexpected error while processing file: %s", e)
+    except ValueError as e:
+        # Security-related errors (e.g., Zip Slip attack detection)
+        logger.error("Security or validation error: %s", e)
         sys.exit(1)
+    except OSError as e:
+        # File system errors (permissions, disk full, etc.)
+        logger.error("File system error: %s", e)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        logger.info("Operation cancelled by user")
+        sys.exit(130)
 
 
 if __name__ == "__main__":
