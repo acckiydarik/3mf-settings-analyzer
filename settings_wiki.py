@@ -47,8 +47,19 @@ _GITHUB_API_BASE = f"https://api.github.com/repos/{_GITHUB_REPO_OWNER}/{_GITHUB_
 _GITHUB_RAW_BASE = f"https://raw.githubusercontent.com/{_GITHUB_REPO_OWNER}/{_GITHUB_REPO_NAME}/{_GITHUB_BRANCH}/src"
 
 # Network timeout settings (in seconds)
-_API_TIMEOUT = int(os.environ.get("ORCASLICER_API_TIMEOUT", "10"))
-_DOWNLOAD_TIMEOUT = int(os.environ.get("ORCASLICER_DOWNLOAD_TIMEOUT", "30"))
+def _safe_int_env(name: str, default: int) -> int:
+    """Read an integer from an environment variable with a safe fallback."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("Invalid integer for env var %s=%r, using default %d", name, raw, default)
+        return default
+
+_API_TIMEOUT = _safe_int_env("ORCASLICER_API_TIMEOUT", 10)
+_DOWNLOAD_TIMEOUT = _safe_int_env("ORCASLICER_DOWNLOAD_TIMEOUT", 30)
 
 # SHA hash length for change detection
 _SHA_HASH_LENGTH = 12

@@ -1019,7 +1019,11 @@ def _print_global_settings(console: Console, profile: Dict[str, Any], wiki_label
     if profile['line_width']:
         gs.add_row(wiki_label("Line Width", "line_width"), f"{profile['line_width']} mm")
     if profile['print_flow_ratio'] and profile['print_flow_ratio'] != '1':
-        gs.add_row(wiki_label("Print Flow Ratio", "print_flow_ratio"), f"{float(profile['print_flow_ratio'])*100:.0f}%")
+        try:
+            flow_pct = f"{float(profile['print_flow_ratio']) * 100:.0f}%"
+        except (ValueError, TypeError):
+            flow_pct = str(profile['print_flow_ratio'])
+        gs.add_row(wiki_label("Print Flow Ratio", "print_flow_ratio"), flow_pct)
     elif profile['filament_flow_ratio']:
         gs.add_row(wiki_label("Filament Flow Ratio", "filament_flow_ratio"), profile['filament_flow_ratio'])
     gs.add_row(wiki_label("Wall Loops", "wall_loops"), profile['wall_loops'])
@@ -1382,7 +1386,7 @@ def _print_objects_table_gcode(console: Console, objects: List[str]):
     table.add_column("Name", style="white", min_width=30)
     
     for i, obj_name in enumerate(objects, 1):
-        table.add_row(str(i), f"[bold white]{obj_name}[/bold white]")
+        table.add_row(str(i), f"[bold white]{escape(obj_name)}[/bold white]")
     
     console.print(table)
 
@@ -1486,11 +1490,12 @@ def _print_objects_table(console: Console, rows: List[Dict], profile: Dict[str, 
         brim = _format_object_value(row['brim'], row['brim_custom'], profile['brim_type'], show_diff)
         speed = _format_object_value(row['outer_wall_speed'], row['speed_custom'], profile['outer_wall_speed'], show_diff)
         
-        # Name style
+        # Name style (escape to prevent Rich markup injection from object names)
+        safe_name = escape(name)
         if row['is_parent']:
-            name_style = "[bold white]" + name + "[/bold white]"
+            name_style = f"[bold white]{safe_name}[/bold white]"
         else:
-            name_style = "[dim]" + name + "[/dim]"
+            name_style = f"[dim]{safe_name}[/dim]"
         
         table.add_row(plate_styled, name_style, fil_styled, layer, walls, infill, support, brim, speed)
         

@@ -1,13 +1,13 @@
 {
   "_meta": {
-    "updated": "2026-02-13 09:52 UTC",
+    "updated": "2026-02-16 16:08 UTC",
     "wiki_base": "https://github.com/OrcaSlicer/OrcaSlicer/wiki/",
     "sha": {
-      "Tab.cpp": "37422fd44458",
-      "PrintConfig.cpp": "b76d8a5c9f98"
+      "Tab.cpp": "e866c46c5b0c",
+      "PrintConfig.cpp": "8542b906c3a4"
     },
-    "total_settings": 689,
-    "with_wiki_page": 461
+    "total_settings": 696,
+    "with_wiki_page": 468
   },
   "settings": {
     "accel_to_decel_enable": {
@@ -765,6 +765,20 @@
       "tooltip": "If enabled, this slicing will be considered using timelapse.",
       "default": "false"
     },
+    "enable_tower_interface_cooldown_during_tower": {
+      "type": "bool",
+      "label": "Cool down from interface boost during prime tower",
+      "tooltip": "When interface-layer temperature boost is active, set the nozzle back to print temperature at the start of the prime tower so it cools down during the tower.",
+      "default": "false",
+      "wiki_page": "multimaterial_settings_prime_tower"
+    },
+    "enable_tower_interface_features": {
+      "type": "bool",
+      "label": "Enable tower interface features",
+      "tooltip": "Enable optimized prime tower interface behavior when different materials meet.",
+      "default": "false",
+      "wiki_page": "multimaterial_settings_prime_tower"
+    },
     "enable_wrapping_detection": {
       "type": "bool",
       "label": "Enable clumping detection",
@@ -1246,6 +1260,41 @@
       "sidetext": "s",
       "tooltip": "Time to wait after the filament is unloaded. May help to get reliable tool changes with flexible materials that may need more time to shrink to original dimensions.",
       "wiki_page": "material_multimaterial#delay-after-unloading"
+    },
+    "filament_tower_interface_pre_extrusion_dist": {
+      "type": "float",
+      "label": "Interface layer pre-extrusion distance",
+      "sidetext": "mm",
+      "tooltip": "Pre-extrusion distance for prime tower interface layer (where different materials meet).",
+      "wiki_page": "material_multimaterial#multimaterial-wipe-tower-parameters"
+    },
+    "filament_tower_interface_pre_extrusion_length": {
+      "type": "float",
+      "label": "Interface layer pre-extrusion length",
+      "sidetext": "mm",
+      "tooltip": "Pre-extrusion length for prime tower interface layer (where different materials meet).",
+      "wiki_page": "material_multimaterial#multimaterial-wipe-tower-parameters"
+    },
+    "filament_tower_interface_print_temp": {
+      "type": "int",
+      "label": "Interface layer print temperature",
+      "sidetext": "°C",
+      "tooltip": "Print temperature for prime tower interface layer (where different materials meet). If set to -1, use max recommended nozzle temperature.",
+      "wiki_page": "material_multimaterial#multimaterial-wipe-tower-parameters"
+    },
+    "filament_tower_interface_purge_volume": {
+      "type": "float",
+      "label": "Interface layer purge length",
+      "sidetext": "mm",
+      "tooltip": "Purge length for prime tower interface layer (where different materials meet).",
+      "wiki_page": "material_multimaterial#multimaterial-wipe-tower-parameters"
+    },
+    "filament_tower_ironing_area": {
+      "type": "float",
+      "label": "Tower ironing area",
+      "sidetext": "mm²",
+      "tooltip": "Ironing area for prime tower interface layer (where different materials meet).",
+      "wiki_page": "material_multimaterial#multimaterial-wipe-tower-parameters"
     },
     "filament_type": {
       "type": "string",
