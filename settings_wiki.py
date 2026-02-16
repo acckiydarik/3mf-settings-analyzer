@@ -554,11 +554,18 @@ def _load_cache() -> dict:
             if (_DATA_DIR / "Tab.cpp").exists() and (_DATA_DIR / "PrintConfig.cpp").exists():
                 generate_json()
             else:
-                logger.warning(
-                    "No data files found. Run 'python settings_wiki.py' to download and generate."
-                )
-                _cache = {"_meta": {}, "settings": {}}
-                return _cache
+                logger.debug("No local data files found, attempting auto-download...")
+                try:
+                    if _download_all_and_regenerate():
+                        logger.debug("Wiki data auto-downloaded successfully.")
+                    else:
+                        logger.debug("Auto-download failed.")
+                        _cache = {"_meta": {}, "settings": {}}
+                        return _cache
+                except Exception as e:
+                    logger.debug("Auto-download error: %s", e)
+                    _cache = {"_meta": {}, "settings": {}}
+                    return _cache
 
         try:
             with open(_JSON_PATH, 'r', encoding='utf-8') as f:

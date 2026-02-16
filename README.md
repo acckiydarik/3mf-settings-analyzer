@@ -31,7 +31,7 @@ A command-line tool that extracts and displays print settings from **3MF** and *
 ### Common features
 
 - **JSON export** -- raw structured data output for scripting and automation
-- **Wiki links** -- clickable hyperlinks to [OrcaSlicer wiki](https://github.com/OrcaSlicer/OrcaSlicer/wiki) for each setting (`--wiki`)
+- **Wiki links** -- clickable hyperlinks to [OrcaSlicer wiki](https://github.com/OrcaSlicer/OrcaSlicer/wiki) for each setting (`--wiki`). Reference data is auto-downloaded on first use (~1 MB) and cached locally for subsequent runs
 - **Colored terminal output** -- powered by [Rich](https://github.com/Textualize/rich)
 
 ### Supported slicers
@@ -312,9 +312,7 @@ The analyzer parses:
 │   ├── test_analyzer.py    # Tests for analyze.py
 │   └── test_settings_wiki.py  # Tests for settings_wiki.py
 ├── data/
-│   ├── PrintConfig.cpp     # OrcaSlicer source (setting definitions)
-│   ├── Tab.cpp             # OrcaSlicer source (wiki page mappings)
-│   └── settings_wiki.json  # Cached parsed settings metadata
+│   └── settings_wiki.json  # Cached parsed settings metadata (auto-generated)
 ├── requirements.txt    # Python dependencies
 ├── README.md           # Documentation
 ├── LICENSE             # MIT license
@@ -346,3 +344,5 @@ pytest tests/ -v
 ## License
 
 MIT
+
+Wiki reference data is extracted from [OrcaSlicer](https://github.com/OrcaSlicer/OrcaSlicer) (AGPL-3.0). The source files are not included in this repository and are downloaded on demand.

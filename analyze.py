@@ -1285,14 +1285,14 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
             stats_table.add_row("Filament Volume Per Extruder", per_ext_cm3)
     
     if statistics.get('filament_cost') and statistics['filament_cost'] > 0:
-        stats_table.add_row("Filament Cost (Total)", f"${statistics['filament_cost']:.2f}")
+        stats_table.add_row("Filament Cost (Total)", f"[gold1]${statistics['filament_cost']:.2f}[/gold1]")
     
     if statistics.get('filament_cost_per_extruder'):
         per_ext_cost = _format_filament_list(
             [f"${v:.2f}" for v in statistics['filament_cost_per_extruder']]
         )
         if per_ext_cost:
-            stats_table.add_row("Filament Cost Per Extruder", per_ext_cost)
+            stats_table.add_row("Filament Cost Per Extruder", f"[gold1]{per_ext_cost}[/gold1]")
     
     if statistics.get('filament_changes') and statistics['filament_changes'] > 0:
         stats_table.add_row("Filament Changes", str(statistics['filament_changes']))
@@ -1585,7 +1585,7 @@ def _get_file_type(filepath: Path) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='3MF/Gcode Settings Analyzer - Analyze 3MF and Gcode files and display slicer settings',
+        description='3MF Settings Analyzer - Analyze 3MF and Gcode files and display slicer settings',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -1654,6 +1654,23 @@ Examples:
     if file_type == 'unknown':
         logger.error("Unsupported file type: %s (use .3mf or .gcode)", filepath.suffix)
         sys.exit(1)
+    
+    # Pre-load wiki data before output so download messages don't interrupt tables
+    if args.wiki and not args.json:
+        try:
+            from settings_wiki import _load_cache, _JSON_PATH
+            if not _JSON_PATH.exists():
+                console = Console(no_color=args.no_color)
+                console.print("[cyan]Downloading wiki data from OrcaSlicer GitHub...[/cyan]")
+                _load_cache()
+                if _JSON_PATH.exists():
+                    console.print("[green]Wiki data downloaded successfully.[/green]")
+                else:
+                    console.print("[yellow]Wiki data unavailable. Wiki links will be disabled.[/yellow]")
+            else:
+                _load_cache()
+        except Exception as e:
+            logger.debug("Wiki pre-load failed: %s", e)
     
     try:
         if file_type == '3mf':
