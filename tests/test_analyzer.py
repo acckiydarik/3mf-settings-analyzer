@@ -17,6 +17,8 @@ from analyze import (
     _format_object_value,
     _format_support_value,
     _format_file_size,
+    _format_filament_list,
+    _hex_to_color_name,
     _get_file_type,
     main,
     print_results,
@@ -838,6 +840,15 @@ class TestGcodeAnalyzer:
         assert stats['total_layers'] == 138
         assert stats['filament_used_g'] == 11.26
 
+    def test_analyze_extracts_filament_cost_per_extruder(self, sample_gcode: Path):
+        """analyze() should extract per-extruder filament cost."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        stats = result['statistics']
+        assert stats['filament_cost_per_extruder'] == [0.20, 0.02, 0.01]
+        assert stats['filament_cost'] == 0.23
+
     def test_analyze_extracts_object_names(self, sample_gcode: Path):
         """analyze() should extract object names from markers."""
         analyzer = GcodeAnalyzer(sample_gcode)
@@ -1085,3 +1096,437 @@ class TestPrintGcodeResults:
         result = analyzer.analyze()
         
         print_gcode_results(result, wiki=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test _hex_to_color_name function
+# ═══════════════════════════════════════════════════════════════
+
+class TestHexToColorName:
+    """Tests for _hex_to_color_name helper function."""
+
+    # --- Primary / high-saturation colors ---
+
+    def test_red(self):
+        """Pure red should return 'Red'."""
+        name, style = _hex_to_color_name('#DE1619FF')
+        assert name == 'Red'
+        assert style == 'red'
+
+    def test_green(self):
+        """Pure green should return 'Green'."""
+        name, style = _hex_to_color_name('#00CC00FF')
+        assert name == 'Green'
+        assert style == 'green'
+
+    def test_blue(self):
+        """Pure blue should return 'Blue'."""
+        name, style = _hex_to_color_name('#0000FFFF')
+        assert name == 'Blue'
+        assert style == 'blue'
+
+    def test_yellow(self):
+        """Yellow should return 'Yellow'."""
+        name, style = _hex_to_color_name('#FFFF00FF')
+        assert name == 'Yellow'
+        assert style == 'yellow'
+
+    def test_magenta(self):
+        """Magenta should return 'Magenta'."""
+        name, style = _hex_to_color_name('#FF00FFFF')
+        assert name == 'Magenta'
+        assert style == 'magenta'
+
+    def test_cyan(self):
+        """Cyan should return 'Cyan'."""
+        name, style = _hex_to_color_name('#00FFFFFF')
+        assert name == 'Cyan'
+        assert style == 'cyan'
+
+    def test_orange(self):
+        """Orange should return 'Orange'."""
+        name, style = _hex_to_color_name('#FF8000FF')
+        assert name == 'Orange'
+        assert style == 'dark_orange'
+
+    def test_purple(self):
+        """Purple should return 'Purple'."""
+        name, style = _hex_to_color_name('#9900CCFF')
+        assert name == 'Purple'
+        assert style == 'purple'
+
+    def test_brown(self):
+        """Brown-ish color should return 'Brown'."""
+        name, style = _hex_to_color_name('#A07060FF')
+        assert name == 'Brown'
+        assert style == 'orange4'
+
+    def test_pink(self):
+        """Pink should return 'Pink'."""
+        name, style = _hex_to_color_name('#FFB0B0FF')
+        assert name == 'Pink'
+        assert style == 'hot_pink'
+
+    # --- Grayscale colors ---
+
+    def test_black(self):
+        """Near-black should return 'Black'."""
+        name, style = _hex_to_color_name('#000000FF')
+        assert name == 'Black'
+        assert style == 'grey23'
+
+    def test_dark_gray(self):
+        """Dark gray should return 'Dark Gray'."""
+        name, style = _hex_to_color_name('#505050FF')
+        assert name == 'Dark Gray'
+        assert style == 'grey50'
+
+    def test_gray(self):
+        """Medium gray should return 'Gray'."""
+        name, style = _hex_to_color_name('#909090FF')
+        assert name == 'Gray'
+        assert style == 'grey70'
+
+    def test_light_gray(self):
+        """Light gray should return 'Light Gray'."""
+        name, style = _hex_to_color_name('#C8C8C8FF')
+        assert name == 'Light Gray'
+        assert style == 'grey85'
+
+    def test_white(self):
+        """Pure white should return 'White'."""
+        name, style = _hex_to_color_name('#FFFFFFFF')
+        assert name == 'White'
+        assert style == 'bright_white'
+
+    # --- Format variations ---
+
+    def test_rrggbb_format(self):
+        """#RRGGBB without alpha should work."""
+        name, style = _hex_to_color_name('#FF0000')
+        assert name == 'Red'
+        assert style == 'red'
+
+    def test_rrggbbaa_format(self):
+        """#RRGGBBAA format should work."""
+        name, style = _hex_to_color_name('#00FF0080')
+        assert name == 'Green'
+        assert style == 'green'
+
+    # --- Invalid inputs ---
+
+    def test_empty_string(self):
+        """Empty string should return itself and 'white' style."""
+        name, style = _hex_to_color_name('')
+        assert name == ''
+        assert style == 'white'
+
+    def test_no_hash_prefix(self):
+        """String without # prefix should return itself."""
+        name, style = _hex_to_color_name('FF0000')
+        assert name == 'FF0000'
+        assert style == 'white'
+
+    def test_short_hex(self):
+        """Too-short hex should return itself."""
+        name, style = _hex_to_color_name('#FFF')
+        assert name == '#FFF'
+        assert style == 'white'
+
+    def test_non_hex_chars(self):
+        """Non-hex characters should be handled gracefully."""
+        name, style = _hex_to_color_name('#XYZXYZ')
+        assert name == '#XYZXYZ'
+        assert style == 'white'
+
+    def test_none_input(self):
+        """None should be handled gracefully."""
+        name, style = _hex_to_color_name(None)
+        assert name is None
+        assert style == 'white'
+
+    def test_fallback_returns_hex_code(self):
+        """Unclassifiable color should return original hex code."""
+        # A color that's not clearly in any category
+        name, style = _hex_to_color_name('#010180FF')
+        # Should fallback to hex
+        assert style == 'white'  # fallback style is always white
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test _format_filament_list function
+# ═══════════════════════════════════════════════════════════════
+
+class TestFormatFilamentList:
+    """Tests for _format_filament_list helper function."""
+
+    def test_empty_list(self):
+        """Empty list should return empty string."""
+        assert _format_filament_list([]) == ''
+
+    def test_single_value(self):
+        """Single value should return it without separator."""
+        assert _format_filament_list([10.5]) == '10.5'
+
+    def test_single_value_with_suffix(self):
+        """Single value with suffix should append suffix."""
+        assert _format_filament_list([10.5], ' g') == '10.5 g'
+
+    def test_multiple_values(self):
+        """Multiple values should be comma-separated."""
+        assert _format_filament_list([1, 2, 3]) == '1, 2, 3'
+
+    def test_multiple_values_with_suffix(self):
+        """Multiple values with suffix should append suffix to each."""
+        result = _format_filament_list(['10.08', '0.87'], ' g')
+        assert result == '10.08 g, 0.87 g'
+
+    def test_string_values(self):
+        """String values should be formatted correctly."""
+        result = _format_filament_list(['PLA', 'PETG'])
+        assert result == 'PLA, PETG'
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test GcodeAnalyzerMethods extensions
+# ═══════════════════════════════════════════════════════════════
+
+class TestGcodeAnalyzerMethodsExtended:
+    """Extended tests for GcodeAnalyzer internal methods."""
+
+    def test_get_list_value_comma_separated(self, sample_gcode: Path):
+        """_get_list_value should parse comma-separated values."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+
+        # nozzle_diameter is "0.4,0.4,0.4,0.4"
+        values = analyzer._get_list_value('nozzle_diameter')
+        assert values == ['0.4', '0.4', '0.4', '0.4']
+
+    def test_get_list_value_single_value(self, sample_gcode: Path):
+        """_get_list_value with single non-list value should return list."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+
+        # layer_height is a single value "0.16"
+        values = analyzer._get_list_value('layer_height')
+        assert values == ['0.16']
+
+    def test_get_value_with_both_separators(self, temp_dir: Path):
+        """_get_value with value containing both ; and , should prefer ;."""
+        gcode_path = temp_dir / "both_sep.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; mixed_value = a,b;c,d
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        # Semicolon takes priority over comma
+        value = analyzer._get_value('mixed_value')
+        assert value == 'a,b'
+
+    def test_get_list_value_missing_key(self, sample_gcode: Path):
+        """_get_list_value with missing key should return default."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+
+        values = analyzer._get_list_value('nonexistent_key', ['default'])
+        assert values == ['default']
+
+    def test_get_list_value_missing_key_no_default(self, sample_gcode: Path):
+        """_get_list_value with missing key and no default should return empty list."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+
+        values = analyzer._get_list_value('nonexistent_key')
+        assert values == []
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test GcodeCustomGlobalSettings (dedicated)
+# ═══════════════════════════════════════════════════════════════
+
+class TestGcodeCustomGlobalSettings:
+    """Dedicated tests for GcodeAnalyzer._get_custom_global_settings."""
+
+    def test_extracts_custom_settings(self, sample_gcode: Path):
+        """Should extract settings listed in different_settings_to_system."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert 'wall_loops' in custom
+        assert custom['wall_loops'] == '3'
+        assert 'sparse_infill_density' in custom
+        assert custom['sparse_infill_density'] == '15%'
+
+    def test_empty_different_settings(self, temp_dir: Path):
+        """Empty different_settings_to_system should return empty dict."""
+        gcode_path = temp_dir / "empty_diff.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; different_settings_to_system = 
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert custom == {}
+
+    def test_missing_different_settings(self, temp_dir: Path):
+        """Missing different_settings_to_system should return empty dict."""
+        gcode_path = temp_dir / "no_diff.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; layer_height = 0.2
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert custom == {}
+
+    def test_key_listed_but_not_in_settings(self, temp_dir: Path):
+        """Key in different_settings but not in settings should be skipped."""
+        gcode_path = temp_dir / "missing_key.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; different_settings_to_system = ghost_key;layer_height
+; layer_height = 0.2
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert 'ghost_key' not in custom
+        assert 'layer_height' in custom
+        assert custom['layer_height'] == '0.2'
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test Edge Cases for Gcode Parsing
+# ═══════════════════════════════════════════════════════════════
+
+class TestGcodeEdgeCases:
+    """Edge case tests for gcode parsing."""
+
+    def test_malformed_generated_by_header(self, temp_dir: Path):
+        """Malformed 'generated by' line should not crash."""
+        gcode_path = temp_dir / "bad_header.gcode"
+        gcode_path.write_text("""; HEADER_BLOCK_START
+; generated by SomeSlicer without version info
+; HEADER_BLOCK_END
+
+; CONFIG_BLOCK_START
+; layer_height = 0.2
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        result = analyzer.analyze()
+
+        # Should not crash; slicer info may be empty
+        assert result['statistics']['slicer'] == ''
+
+    def test_config_value_containing_equals(self, temp_dir: Path):
+        """Config value containing '=' should parse correctly."""
+        gcode_path = temp_dir / "equals_value.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; some_key = val = extra
+; layer_height = 0.2
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        # partition(' = ') splits on the first occurrence only
+        assert analyzer.settings.get('some_key') == 'val = extra'
+        assert analyzer.settings.get('layer_height') == '0.2'
+
+    def test_non_numeric_statistics_values(self, temp_dir: Path):
+        """Non-numeric statistics should not crash the parser."""
+        gcode_path = temp_dir / "bad_stats.gcode"
+        gcode_path.write_text("""; HEADER_BLOCK_START
+; total layer number: not_a_number
+; max_z_height: also_not_a_number
+; HEADER_BLOCK_END
+
+; CONFIG_BLOCK_START
+; layer_height = 0.2
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        result = analyzer.analyze()
+
+        # Bug fix 1c ensures these fallback to 0
+        assert result['statistics']['total_layers'] == 0
+        assert result['statistics']['max_height'] == 0.0
+
+    def test_build_statistics_with_new_fields(self, sample_gcode: Path):
+        """_build_statistics should include all new fields."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+
+        stats = result['statistics']
+        assert 'printer_model' in stats
+        assert stats['printer_model'] == 'Snapmaker U1'
+        assert 'gcode_flavor' in stats
+        assert stats['gcode_flavor'] == 'marlin'
+        assert 'nozzle_type' in stats
+        assert stats['nozzle_type'] == 'hardened_steel'
+        assert 'curr_bed_type' in stats
+        assert stats['curr_bed_type'] == 'Engineering Plate'
+        assert 'filament_vendor' in stats
+        assert 'Snapmaker' in stats['filament_vendor']
+        assert 'eSUN' in stats['filament_vendor']
+        assert 'enable_prime_tower' in stats
+        assert stats['enable_prime_tower'] == '0'
+        assert 'filament_used_per_extruder_cm3' in stats
+
+    def test_build_statistics_fallback_paths(self, temp_dir: Path):
+        """_build_statistics should handle missing optional fields."""
+        gcode_path = temp_dir / "minimal_stats.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; layer_height = 0.2
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        result = analyzer.analyze()
+
+        stats = result['statistics']
+        assert stats['printer_model'] == ''
+        assert stats['gcode_flavor'] == ''
+        assert stats['nozzle_type'] == ''
+        assert stats['curr_bed_type'] == ''
+        assert stats['filament_vendor'] == []
+        assert stats['enable_prime_tower'] == ''
+        assert stats['filament_used_per_extruder_cm3'] == []
+        assert stats['filament_cost_per_extruder'] == []
+        assert stats['total_layers'] == 0
+        assert stats['max_height'] == 0.0
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test CLI combined flags for gcode
+# ═══════════════════════════════════════════════════════════════
+
+class TestGcodeCLICombinedFlags:
+    """Test combined CLI flags for gcode files."""
+
+    def test_main_gcode_combined_flags(self, sample_gcode: Path, capsys):
+        """Multiple flags should work together for gcode files."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--diff', '--wiki', '--no-color']):
+            main()
+
+        captured = capsys.readouterr()
+        assert len(captured.out) > 0
+
+    def test_main_gcode_json_verbose(self, sample_gcode: Path, capsys):
+        """--json and --verbose should work together for gcode."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--json', '--verbose']):
+            main()
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert 'statistics' in data
+        assert 'printer_model' in data['statistics']

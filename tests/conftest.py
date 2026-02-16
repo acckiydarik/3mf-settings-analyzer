@@ -376,8 +376,9 @@ G1 X200 E20 F1500
 ; printing object SecondObject.stl id:987654321 copy 0
 
 ; filament used [g] = 10.08, 0.87, 0.31
+; filament cost = 0.20, 0.02, 0.01
 ; total filament used [g] = 11.26
-; total filament cost = 0.45
+; total filament cost = 0.23
 ; total filament change = 2
 ; estimated printing time (normal mode) = 1h 11m 17s
 ; estimated first layer printing time (normal mode) = 2m 30s
@@ -402,6 +403,12 @@ G1 X200 E20 F1500
 ; first_layer_bed_temperature = 65
 ; first_layer_temperature = 220
 ; different_settings_to_system = wall_loops;sparse_infill_density
+; printer_model = Snapmaker U1
+; gcode_flavor = marlin
+; nozzle_type = hardened_steel
+; curr_bed_type = Engineering Plate
+; filament_vendor = "Snapmaker";"eSUN"
+; enable_prime_tower = 0
 ; CONFIG_BLOCK_END
 """
 

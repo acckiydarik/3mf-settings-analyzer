@@ -1,8 +1,10 @@
 # 3MF Settings Analyzer
 
-A command-line tool that extracts and displays print settings from 3MF files in a structured, color-coded table format. Designed for quick inspection of slicer configurations without opening the slicer itself.
+A command-line tool that extracts and displays print settings from **3MF** and **Gcode** files in a structured, color-coded table format. Designed for quick inspection of slicer configurations without opening the slicer itself.
 
 ## Features
+
+### 3MF analysis
 
 - **Profile overview** -- printer, process profile, and filament presets at a glance
 - **Global settings** -- layer height, walls, infill, speeds, temperatures, retraction, fan, and more
@@ -11,18 +13,35 @@ A command-line tool that extracts and displays print settings from 3MF files in 
 - **Part hierarchy** -- displays compound objects with their sub-components
 - **Multi-plate support** -- handles projects with multiple build plates
 - **Diff mode** -- side-by-side comparison of custom values against profile defaults
+
+### Gcode analysis
+
+- **Profile and global settings** -- same structured output as 3MF (extracted from CONFIG_BLOCK)
+- **Custom global settings** -- detects profile overrides via `different_settings_to_system`
+- **Object list** -- all printed objects extracted from gcode markers
+- **Statistics panel** -- comprehensive print statistics:
+  - Slicer info, file size, printer model, gcode flavor, nozzle type, bed type
+  - Time estimates (total and first layer)
+  - Layer info (count, height, max Z)
+  - Filament usage (weight, volume, cost -- total and per extruder)
+  - Filament details (name, vendor, type, color, density, diameter)
+  - Temperature settings (nozzle and bed, including first layer)
+  - Multi-material info (filament changes, prime tower status)
+
+### Common features
+
 - **JSON export** -- raw structured data output for scripting and automation
 - **Wiki links** -- clickable hyperlinks to [OrcaSlicer wiki](https://github.com/OrcaSlicer/OrcaSlicer/wiki) for each setting (`--wiki`)
 - **Colored terminal output** -- powered by [Rich](https://github.com/Textualize/rich)
 
 ### Supported slicers
 
-Works with 3MF files produced by:
+Works with 3MF and Gcode files produced by:
 
 - [Bambu Studio](https://bambulab.com/en/download/studio)
 - [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer)
 - [Snapmaker Orca](https://www.snapmaker.com/snapmaker-orca) (based on OrcaSlicer)
-- Other slicers using the same 3MF metadata format (project_settings.config / model_settings.config)
+- Other slicers using the same 3MF metadata format or Gcode comment conventions
 
 ## Getting Started
 
@@ -42,12 +61,13 @@ pip install -r requirements.txt
 
 ```bash
 python3 analyze.py model.3mf
+python3 analyze.py model.gcode
 ```
 
 ## Usage
 
 ```bash
-python3 analyze.py <file.3mf> [options]
+python3 analyze.py <file> [options]
 ```
 
 ### Options
@@ -66,10 +86,16 @@ python3 analyze.py <file.3mf> [options]
 
 ### Examples
 
-Analyze a file with default output:
+Analyze a 3MF file:
 
 ```bash
 python3 analyze.py model.3mf
+```
+
+Analyze a Gcode file:
+
+```bash
+python3 analyze.py model.gcode
 ```
 
 Show differences between custom and default values:
@@ -78,10 +104,10 @@ Show differences between custom and default values:
 python3 analyze.py model.3mf --diff
 ```
 
-Export structured data as JSON (tables are suppressed):
+Export structured data as JSON:
 
 ```bash
-python3 analyze.py model.3mf --json
+python3 analyze.py model.gcode --json
 ```
 
 With clickable wiki links on setting names:
@@ -104,76 +130,86 @@ python3 analyze.py --update-wiki
 
 ## Output Overview
 
-The analyzer produces several sections. Here is a full example:
+### 3MF output
 
 ```text
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ 3MF SETTINGS ANALYZER  │  example.3mf                                        │
+│ 3MF SETTINGS ANALYZER  |  example.3mf                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 ╭────────────────────────────────── PROFILE ───────────────────────────────────╮
 │   Printer       Bambu Lab A1 mini 0.4 nozzle                                 │
 │   Process       0.20mm Standard @BBL A1M                                     │
 │   Filament 1    Bambu PLA Basic @BBL A1M                                     │
-│   Filament 2    Bambu PLA Basic @BBL A1M                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭────────────────────────────── GLOBAL SETTINGS ───────────────────────────────╮
 │   Layer Height                   0.2 mm                                      │
-│   Initial Layer Print Height     0.2 mm                                      │
-│   Line Width                     0.42 mm                                     │
-│   Filament Flow Ratio            0.98                                        │
 │   Wall Loops                     3                                           │
 │   Sparse Infill Density          15%                                         │
-│   Top/Bottom Shell Layers        5/3                                         │
-│   Brim Type                      no_brim                                     │
-│   Enable Support                 Off                                         │
-│   Seam Position                  back                                        │
-│                                                                              │
-│   Initial Layer Speed            50 mm/s                                     │
-│   Outer Wall Speed               200 mm/s                                    │
-│   Inner Wall Speed               300 mm/s                                    │
-│   Sparse Infill Speed            270 mm/s                                    │
-│   Top Surface Speed              200 mm/s                                    │
-│   Travel Speed                   700 mm/s                                    │
-│   Bridge Speed                   50 mm/s                                     │
-│                                                                              │
-│   Sparse Infill Pattern          gyroid                                      │
-│   Top Surface Pattern            monotonicline                               │
-│   Print Sequence                 by object                                   │
-│   Ironing Type                   top                                         │
-│                                                                              │
-│   Retraction Length              0.8 mm                                      │
-│   Retraction Speed               30 mm/s                                     │
-│   Z-Hop                          0.4 mm                                      │
-│   Pressure Advance               0.02                                        │
-│   Fan Min/Max Speed              60% / 80%                                   │
-│   Slow Down for Layer Cooling    On (6s)                                     │
-│                                                                              │
-│   Nozzle Temperature             220°C                                       │
-│   Bed Temperature                60°C                                        │
-│                                                                              │
-│   Features                       Enable Arc Fitting, Enable Overhang Speed   │
+│   ...                                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─────────────── CUSTOM GLOBAL SETTINGS (changed from profile) ────────────────╮
-│   ✎ brim_object_gap          0.35                                            │
-│   ✎ print_sequence           by object                                       │
-│   ✎ seam_position            back                                            │
-│   ✎ wall_loops               3                                               │
+│   * wall_loops               3                                               │
+│   * seam_position            back                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-─────────────────────────────────── OBJECTS ───────────────────────────────────
+─────────────────────────────────── OBJECTS ────────────────────────────────────
 ╭───────┬──────────────────────────┬──────────┬───────┬───────┬────────┬─────────╮
 │ Plate │ Name                     │ Filament │ Layer │ Walls │ Infill │ Support │
 ├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┤
 │   1   │ MyObject                 │    1     │  0.2  │   3   │   15   │   Off   │
-├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┤
 │   1   │ Assembly                 │    1     │  0.2  │   3   │  *80   │   *On   │
 │       │     ├─ enable_support: 1 │          │       │       │        │         │
 │       │     └─ sparse_infill: 80 │          │       │       │        │         │
 │       │   part_a                 │    1     │       │   3   │   80   │   On    │
 │       │   part_b                 │    2     │       │   3   │   80   │   On    │
 ╰───────┴──────────────────────────┴──────────┴───────┴───────┴────────┴─────────╯
-
 * = custom value (overrides profile default)
+```
+
+### Gcode output
+
+```text
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ GCODE SETTINGS ANALYZER  |  model.gcode                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────── PROFILE ───────────────────────────────────╮
+│   Printer       Snapmaker U1 (0.4 nozzle)                                    │
+│   Process       0.16 High Quality @Snapmaker U1 (0.4 nozzle)                 │
+│   Filament 1    Snapmaker PLA SnapSpeed @U1                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────── GLOBAL SETTINGS ───────────────────────────────╮
+│   Layer Height                   0.16 mm                                     │
+│   Wall Loops                     2                                           │
+│   ...                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+─────────────────────────────────── OBJECTS ────────────────────────────────────
+╭──────────────┬───────────────────────────────────────────────────────────────╮
+│      #       │ Name                                                          │
+├──────────────┼───────────────────────────────────────────────────────────────┤
+│      1       │ STL Full Body (keychain).stl                                  │
+╰──────────────┴───────────────────────────────────────────────────────────────╯
+╭───────────────────────────────── STATISTICS ─────────────────────────────────╮
+│   Slicer                          Snapmaker Orca 2.2.1                       │
+│   Generated                       2026-01-30 12:34:13                        │
+│   File Size                       10.14 MB                                   │
+│   Printer Model                   Snapmaker U1                               │
+│                                                                              │
+│   Estimated Time                  1h 11m 17s                                 │
+│   Total Layers                    138                                        │
+│                                                                              │
+│   Filament Weight (Total)         11.26 g                                    │
+│   Filament Weight Per Extruder    10.08 g, 0.87 g, 0.31 g                    │
+│   Filament Volume Per Extruder    8.13 cm3, 0.70 cm3, 0.25 cm3               │
+│   Filament Cost (Total)           $0.23                                      │
+│   Filament Cost Per Extruder      $0.20, $0.02, $0.01                        │
+│   Filament Changes                64                                         │
+│   Filament 1                      Snapmaker PLA SnapSpeed @U1                │
+│   Filament Colors                 Red, White, Black                          │
+│                                                                              │
+│   First Layer Nozzle Temp         220 C                                      │
+│   Bed Temp                        65 C                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ### Output sections
@@ -194,7 +230,7 @@ The analyzer produces several sections. Here is a full example:
 
 **CUSTOM GLOBAL SETTINGS** -- parameters changed from the profile defaults.
 
-**OBJECTS** -- a table with per-object settings:
+**OBJECTS** (3MF) -- a table with per-object settings:
 
 | Column | Description |
 |--------|-------------|
@@ -208,7 +244,11 @@ The analyzer produces several sections. Here is a full example:
 | Brim | Brim type |
 | Speed | Outer wall speed in mm/s |
 
-Custom values are marked with `*`. Per-object overrides (ironing, infill density, support, etc.) are displayed in a tree below each object.
+Custom values are marked with `*`. Per-object overrides are displayed in a tree below each object.
+
+**OBJECTS** (Gcode) -- a numbered list of object names. Gcode does not contain per-object settings.
+
+**STATISTICS** (Gcode only) -- print statistics including slicer info, time estimates, layer details, filament usage (weight/volume/cost per extruder), filament properties, and temperatures.
 
 ### Diff mode
 
@@ -218,7 +258,9 @@ With `--diff`, custom values show the original default alongside:
 │  *80 <-15%  │  *On <-Off  │
 ```
 
-## How 3MF Files Work
+## How It Works
+
+### 3MF files
 
 A `.3mf` file is a ZIP archive with the following structure relevant to this tool:
 
@@ -234,14 +276,39 @@ file.3mf
 
 The analyzer reads `project_settings.config` for global/profile settings and `model_settings.config` for per-object and per-part overrides.
 
+### Gcode files
+
+Gcode files are plain-text machine instruction files. OrcaSlicer-compatible slicers embed metadata as comments with a defined block structure:
+
+```text
+; HEADER_BLOCK_START          <- slicer info, layer count, max height
+; HEADER_BLOCK_END
+
+; printing object NAME id:XX  <- object markers (throughout file)
+; stop printing object NAME
+
+; filament used [g] = ...     <- statistics (before CONFIG_BLOCK)
+; total filament cost = ...
+; estimated printing time = ...
+
+; CONFIG_BLOCK_START          <- all slicer settings (key = value)
+; CONFIG_BLOCK_END
+```
+
+The analyzer parses:
+1. **Header** (first 100 lines) for slicer version and basic info
+2. **Object markers** (full file scan) for printed object names
+3. **Statistics** (last 100KB) for filament usage, time, and layer counts
+4. **CONFIG_BLOCK** (last 100KB) for all slicer settings
+
 ## Project Structure
 
 ```text
 3mf-settings-analyzer/
-├── analyze.py          # Main CLI script
+├── analyze.py          # Main CLI script (ThreeMFAnalyzer + GcodeAnalyzer)
 ├── settings_wiki.py    # OrcaSlicer settings reference module
 ├── tests/              # Unit tests
-│   ├── conftest.py         # Pytest fixtures
+│   ├── conftest.py         # Pytest fixtures (3MF + Gcode)
 │   ├── test_analyzer.py    # Tests for analyze.py
 │   └── test_settings_wiki.py  # Tests for settings_wiki.py
 ├── data/

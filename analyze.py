@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 3MF Settings Analyzer
-Analyzes 3MF files and displays slicer settings in a structured table format.
-Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF metadata format.
+Analyzes 3MF and Gcode files and displays slicer settings in a structured table format.
+Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF/Gcode metadata format.
 """
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 import zipfile
 import json
@@ -573,7 +573,6 @@ class GcodeAnalyzer:
             
         Raises:
             OSError: If the file cannot be read.
-            ValueError: If the file format is not recognized.
         """
         logger.debug("Starting gcode analysis of file: %s", self.filepath)
         
@@ -598,7 +597,7 @@ class GcodeAnalyzer:
                 if i >= 100:
                     break
                 header_lines.append(line)
-                if GCODE_HEADER_END in line:
+                if line.strip() == GCODE_HEADER_END:
                     break
             
             self._parse_header(header_lines)
@@ -677,10 +676,10 @@ class GcodeAnalyzer:
         for line in content.split('\n'):
             line = line.strip()
             
-            if GCODE_CONFIG_START in line:
+            if line == GCODE_CONFIG_START:
                 in_config = True
                 continue
-            elif GCODE_CONFIG_END in line:
+            elif line == GCODE_CONFIG_END:
                 break
             
             if in_config and line.startswith('; ') and ' = ' in line:
@@ -704,6 +703,7 @@ class GcodeAnalyzer:
             'filament_used_g': r'^; filament used \[g\] = (.+)$',
             'filament_used_mm': r'^; filament used \[mm\] = (.+)$',
             'filament_used_cm3': r'^; filament used \[cm3\] = (.+)$',
+            'filament_cost_per_extruder': r'^; filament cost = (.+)$',
             'total_filament_used_g': r'^; total filament used \[g\] = (.+)$',
             'total_filament_cost': r'^; total filament cost = (.+)$',
             'total_filament_change': r'^; total filament change = (\d+)$',
@@ -729,7 +729,8 @@ class GcodeAnalyzer:
                             self.statistics[key] = int(value)
                         except ValueError:
                             self.statistics[key] = value
-                    elif key in ('filament_used_g', 'filament_used_mm', 'filament_used_cm3'):
+                    elif key in ('filament_used_g', 'filament_used_mm', 'filament_used_cm3',
+                                  'filament_cost_per_extruder'):
                         # Parse comma-separated list of floats
                         try:
                             self.statistics[key] = [float(v.strip()) for v in value.split(',')]
@@ -763,7 +764,7 @@ class GcodeAnalyzer:
     
     def _get_list_value(self, key: str, default: Any = None) -> List[str]:
         """Get list value from settings."""
-        value = self.settings.get(key, default)
+        value = self.settings.get(key)
         if value is None:
             return default if default is not None else []
         
@@ -866,9 +867,17 @@ class GcodeAnalyzer:
         stats['estimated_first_layer_time'] = self.statistics.get('estimated_first_layer_time', '')
         
         # Layer info
-        stats['total_layers'] = self.statistics.get('total_layers_count') or \
-                                int(self.header_info.get('total_layer_number', 0) or 0)
-        stats['max_height'] = float(self.header_info.get('max_z_height', 0) or 0)
+        try:
+            stats['total_layers'] = (
+                self.statistics.get('total_layers_count')
+                or int(self.header_info.get('total_layer_number', 0) or 0)
+            )
+        except (ValueError, TypeError):
+            stats['total_layers'] = 0
+        try:
+            stats['max_height'] = float(self.header_info.get('max_z_height', 0) or 0)
+        except (ValueError, TypeError):
+            stats['max_height'] = 0.0
         stats['layer_height'] = self._get_value('layer_height', '')
         stats['first_layer_height'] = self._get_value('first_layer_height', '')
         
@@ -880,6 +889,7 @@ class GcodeAnalyzer:
         stats['filament_used_per_extruder_g'] = self.statistics.get('filament_used_g', [])
         stats['filament_used_per_extruder_mm'] = self.statistics.get('filament_used_mm', [])
         stats['filament_cost'] = self.statistics.get('total_filament_cost', 0)
+        stats['filament_cost_per_extruder'] = self.statistics.get('filament_cost_per_extruder', [])
         stats['filament_changes'] = self.statistics.get('total_filament_change', 0)
         
         # Filament info
@@ -897,6 +907,17 @@ class GcodeAnalyzer:
         stats['nozzle_temp'] = self._get_list_value('nozzle_temperature', [])
         stats['bed_temp'] = self._get_value('hot_plate_temp', '') or \
                             self._get_value('bed_temperature', '')
+        
+        # Printer/Machine info
+        stats['printer_model'] = self._get_value('printer_model', '')
+        stats['gcode_flavor'] = self._get_value('gcode_flavor', '')
+        stats['nozzle_type'] = self._get_value('nozzle_type', '')
+        stats['curr_bed_type'] = self._get_value('curr_bed_type', '')
+        
+        # Filament extra
+        stats['filament_vendor'] = self._get_list_value('filament_vendor', [])
+        stats['filament_used_per_extruder_cm3'] = self.statistics.get('filament_used_cm3', [])
+        stats['enable_prime_tower'] = self._get_value('enable_prime_tower', '')
         
         # File size
         stats['file_size_bytes'] = self.statistics.get('file_size_bytes', 0)
@@ -1195,6 +1216,18 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
     if statistics.get('file_size_bytes'):
         stats_table.add_row("File Size", _format_file_size(statistics['file_size_bytes']))
     
+    if statistics.get('printer_model'):
+        stats_table.add_row("Printer Model", statistics['printer_model'])
+    
+    if statistics.get('gcode_flavor'):
+        stats_table.add_row("G-code Flavor", statistics['gcode_flavor'])
+    
+    if statistics.get('nozzle_type'):
+        stats_table.add_row("Nozzle Type", statistics['nozzle_type'])
+    
+    if statistics.get('curr_bed_type'):
+        stats_table.add_row("Bed Type", statistics['curr_bed_type'])
+    
     # Time estimates
     stats_table.add_row("", "")  # Separator
     
@@ -1225,11 +1258,11 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
         if isinstance(nozzles, list) and nozzles:
             stats_table.add_row("Nozzle Diameter", f"{nozzles[0]} mm")
     
-    # Filament usage
+    # Filament usage -- grouped: weight, volume, cost
     stats_table.add_row("", "")  # Separator
     
     if statistics.get('filament_used_g'):
-        stats_table.add_row("Filament Used (Total)", f"[magenta]{statistics['filament_used_g']:.2f} g[/magenta]")
+        stats_table.add_row("Filament Weight (Total)", f"[magenta]{statistics['filament_used_g']:.2f} g[/magenta]")
     
     if statistics.get('filament_used_per_extruder_g'):
         per_ext = _format_filament_list(
@@ -1237,10 +1270,25 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
             ' g'
         )
         if per_ext:
-            stats_table.add_row("Filament Per Extruder", per_ext)
+            stats_table.add_row("Filament Weight Per Extruder", per_ext)
+    
+    if statistics.get('filament_used_per_extruder_cm3'):
+        per_ext_cm3 = _format_filament_list(
+            [f"{v:.2f}" for v in statistics['filament_used_per_extruder_cm3']],
+            ' cm3'
+        )
+        if per_ext_cm3:
+            stats_table.add_row("Filament Volume Per Extruder", per_ext_cm3)
     
     if statistics.get('filament_cost') and statistics['filament_cost'] > 0:
-        stats_table.add_row("Filament Cost", f"${statistics['filament_cost']:.2f}")
+        stats_table.add_row("Filament Cost (Total)", f"${statistics['filament_cost']:.2f}")
+    
+    if statistics.get('filament_cost_per_extruder'):
+        per_ext_cost = _format_filament_list(
+            [f"${v:.2f}" for v in statistics['filament_cost_per_extruder']]
+        )
+        if per_ext_cost:
+            stats_table.add_row("Filament Cost Per Extruder", per_ext_cost)
     
     if statistics.get('filament_changes') and statistics['filament_changes'] > 0:
         stats_table.add_row("Filament Changes", str(statistics['filament_changes']))
@@ -1252,6 +1300,11 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
             if name:
                 label = f"Filament {i+1}" if len(names) > 1 else "Filament"
                 stats_table.add_row(label, f"[magenta]{name}[/magenta]")
+    
+    if statistics.get('filament_vendor'):
+        vendors = [v for v in statistics['filament_vendor'] if v]
+        if vendors:
+            stats_table.add_row("Filament Vendor", ', '.join(vendors))
     
     if statistics.get('filament_types'):
         types = [t for t in statistics['filament_types'] if t]
@@ -1285,30 +1338,39 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
         if isinstance(diameter, list) and diameter:
             stats_table.add_row("Filament Diameter", f"{diameter[0]} mm")
     
+    if statistics.get('enable_prime_tower'):
+        prime_val = statistics['enable_prime_tower']
+        if prime_val == '1':
+            stats_table.add_row("Prime Tower", "[green]On[/green]")
+        elif prime_val == '0':
+            stats_table.add_row("Prime Tower", "[dim]Off[/dim]")
+        else:
+            stats_table.add_row("Prime Tower", prime_val)
+    
     # Temperatures
     stats_table.add_row("", "")  # Separator
     
     if statistics.get('first_layer_nozzle_temp'):
-        stats_table.add_row("First Layer Nozzle Temp", f"[red]{statistics['first_layer_nozzle_temp']} C[/red]")
+        stats_table.add_row("First Layer Nozzle Temp", f"[red]{statistics['first_layer_nozzle_temp']}°C[/red]")
     
     if statistics.get('nozzle_temp'):
         temps = statistics['nozzle_temp']
         if isinstance(temps, list) and temps:
-            stats_table.add_row("Nozzle Temp", f"[red]{temps[0]} C[/red]")
+            stats_table.add_row("Nozzle Temp", f"[red]{temps[0]}°C[/red]")
     
     if statistics.get('first_layer_bed_temp'):
-        stats_table.add_row("First Layer Bed Temp", f"[red]{statistics['first_layer_bed_temp']} C[/red]")
+        stats_table.add_row("First Layer Bed Temp", f"[red]{statistics['first_layer_bed_temp']}°C[/red]")
     
     if statistics.get('bed_temp'):
-        stats_table.add_row("Bed Temp", f"[red]{statistics['bed_temp']} C[/red]")
+        stats_table.add_row("Bed Temp", f"[red]{statistics['bed_temp']}°C[/red]")
     
     console.print(Panel(stats_table,
                         title="[bold bright_yellow]STATISTICS[/bold bright_yellow]",
                         border_style="grey50", box=box.ROUNDED))
 
 
-def _print_objects_table_gcode(console: Console, objects: List[str], profile: Dict[str, Any]):
-    """Print objects table for gcode files (no per-object settings, only names)."""
+def _print_objects_table_gcode(console: Console, objects: List[str]):
+    """Print objects table for gcode files (names only, no per-object settings)."""
     if not objects:
         console.print("\n[red]No objects found[/red]")
         return
@@ -1316,37 +1378,13 @@ def _print_objects_table_gcode(console: Console, objects: List[str], profile: Di
     console.rule("[bold bright_yellow]OBJECTS[/bold bright_yellow]", style="grey50")
     
     table = Table(box=box.ROUNDED, show_lines=False, header_style="bold blue", expand=True, border_style="grey50")
+    table.add_column("#", justify="center", style="dim", width=5)
     table.add_column("Name", style="white", min_width=30)
-    table.add_column("Layer Height", justify="center")
-    table.add_column("Wall Loops", justify="center")
-    table.add_column("Infill Density", justify="center")
-    table.add_column("Support", justify="center", width=7)
-    table.add_column("Brim Type", justify="center")
-    table.add_column("Outer Wall Speed", justify="center")
     
-    # Format profile values for display
-    layer_height = profile.get('layer_height', '')
-    wall_loops = profile.get('wall_loops', '')
-    infill = str(profile.get('sparse_infill_density', '')).replace('%', '')
-    support = 'On' if profile.get('enable_support') == BOOL_TRUE else 'Off'
-    support_styled = "[green]On[/green]" if support == 'On' else "[dim]Off[/dim]"
-    brim = profile.get('brim_type', '')
-    outer_speed = profile.get('outer_wall_speed', '')
-    
-    for obj_name in objects:
-        table.add_row(
-            f"[bold white]{obj_name}[/bold white]",
-            layer_height,
-            wall_loops,
-            infill,
-            support_styled,
-            brim,
-            outer_speed
-        )
+    for i, obj_name in enumerate(objects, 1):
+        table.add_row(str(i), f"[bold white]{obj_name}[/bold white]")
     
     console.print(table)
-    console.print("[bold yellow]*[/bold yellow] = custom value (overrides profile default)")
-    print()
 
 
 def _format_object_value(val, is_custom: bool, default, show_diff: bool) -> str:
@@ -1510,8 +1548,8 @@ def print_gcode_results(result: Dict[str, Any], show_diff: bool = False, no_colo
     # Custom global settings (same as 3MF)
     _print_custom_global(console, result['custom_global'], wiki_key)
     
-    # Objects table (similar to 3MF but simplified - no per-object settings in gcode)
-    _print_objects_table_gcode(console, result.get('objects', []), profile)
+    # Objects list (gcode has no per-object settings, only names)
+    _print_objects_table_gcode(console, result.get('objects', []))
     
     # Statistics panel (gcode-specific) - at the bottom
     _print_statistics_panel(console, result.get('statistics', {}))
@@ -1627,8 +1665,6 @@ Examples:
             result = analyzer.analyze()
             
             if args.json:
-                # Convert set to list for JSON serialization
-                result['objects'] = list(result.get('objects', []))
                 print(json.dumps(result, indent=2, ensure_ascii=False))
             else:
                 print_gcode_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
