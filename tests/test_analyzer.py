@@ -12,17 +12,23 @@ import pytest
 
 from analyze import (
     ThreeMFAnalyzer,
+    GcodeAnalyzer,
     _is_custom,
     _format_object_value,
     _format_support_value,
+    _format_file_size,
+    _get_file_type,
     main,
     print_results,
+    print_gcode_results,
     setup_logging,
     BOOL_TRUE,
     BOOL_FALSE,
     DEFAULT_EXTRUDER,
     SYSTEM_KEYS,
     INFILL_DENSITY_KEYS,
+    FILE_EXTENSION_3MF,
+    FILE_EXTENSION_GCODE,
 )
 
 
@@ -777,3 +783,305 @@ class TestEdgeCases:
             result = analyzer.analyze()
         
         assert result['profile']['printer'] == "Bambu Lab A1 mini 0.4 nozzle"
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test GcodeAnalyzer
+# ═══════════════════════════════════════════════════════════════
+
+class TestGcodeAnalyzer:
+    """Tests for the GcodeAnalyzer class."""
+
+    def test_accepts_string_path(self, sample_gcode: Path):
+        """Analyzer should accept string filepath."""
+        analyzer = GcodeAnalyzer(str(sample_gcode))
+        assert analyzer.filepath == sample_gcode
+
+    def test_accepts_path_object(self, sample_gcode: Path):
+        """Analyzer should accept Path object."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        assert analyzer.filepath == sample_gcode
+
+    def test_analyze_returns_dict(self, sample_gcode: Path):
+        """analyze() should return a dictionary with expected keys."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        assert isinstance(result, dict)
+        assert 'file' in result
+        assert 'profile' in result
+        assert 'profile_full' in result
+        assert 'custom_global' in result
+        assert 'rows' in result
+        assert 'objects' in result
+        assert 'statistics' in result
+
+    def test_analyze_extracts_profile_info(self, sample_gcode: Path):
+        """analyze() should extract profile information correctly."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        profile = result['profile']
+        assert profile['printer'] == "Snapmaker U1 (0.4 nozzle)"
+        assert profile['process'] == "0.16 High Quality @Snapmaker U1 (0.4 nozzle)"
+        assert "Snapmaker PLA SnapSpeed @U1" in profile['filaments']
+
+    def test_analyze_extracts_statistics(self, sample_gcode: Path):
+        """analyze() should extract print statistics."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        stats = result['statistics']
+        assert stats['slicer'] == "Snapmaker Orca"
+        assert stats['slicer_version'] == "2.2.1"
+        assert stats['estimated_time'] == "1h 11m 17s"
+        assert stats['total_layers'] == 138
+        assert stats['filament_used_g'] == 11.26
+
+    def test_analyze_extracts_object_names(self, sample_gcode: Path):
+        """analyze() should extract object names from markers."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        objects = result['objects']
+        assert 'TestModel.stl' in objects
+        assert 'SecondObject.stl' in objects
+        assert len(objects) == 2
+
+    def test_analyze_extracts_custom_settings(self, sample_gcode: Path):
+        """analyze() should extract custom global settings."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        custom = result['custom_global']
+        assert 'wall_loops' in custom
+        assert 'sparse_infill_density' in custom
+
+    def test_analyze_handles_empty_gcode(self, empty_gcode: Path):
+        """analyze() should handle empty gcode files."""
+        analyzer = GcodeAnalyzer(empty_gcode)
+        result = analyzer.analyze()
+        
+        assert result['profile']['printer'] == 'Unknown'
+        assert result['objects'] == []
+
+    def test_analyze_handles_minimal_gcode(self, minimal_gcode: Path):
+        """analyze() should handle gcode without CONFIG_BLOCK."""
+        analyzer = GcodeAnalyzer(minimal_gcode)
+        result = analyzer.analyze()
+        
+        assert result['profile']['printer'] == 'Unknown'
+        assert result['objects'] == []
+
+    def test_analyze_handles_gcode_without_objects(self, gcode_no_objects: Path):
+        """analyze() should handle gcode without object markers."""
+        analyzer = GcodeAnalyzer(gcode_no_objects)
+        result = analyzer.analyze()
+        
+        assert result['objects'] == []
+        stats = result['statistics']
+        assert stats['total_layers'] == 50
+
+    def test_analyze_handles_unicode_objects(self, gcode_unicode_objects: Path):
+        """analyze() should handle Unicode object names."""
+        analyzer = GcodeAnalyzer(gcode_unicode_objects)
+        result = analyzer.analyze()
+        
+        objects = result['objects']
+        # Check that the Unicode object name was extracted
+        assert any('Тестовый' in obj for obj in objects)
+
+    def test_nonexistent_file_raises_error(self, temp_dir: Path):
+        """Non-existent gcode file should raise OSError."""
+        fake_path = temp_dir / "nonexistent.gcode"
+        analyzer = GcodeAnalyzer(fake_path)
+        
+        with pytest.raises(OSError):
+            analyzer.analyze()
+
+
+class TestGcodeAnalyzerMethods:
+    """Tests for GcodeAnalyzer internal methods."""
+
+    def test_get_value_single(self, sample_gcode: Path):
+        """_get_value should return first value from comma-separated list."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+        
+        # nozzle_diameter is "0.4,0.4,0.4,0.4" - should return first
+        value = analyzer._get_value('nozzle_diameter')
+        assert value == '0.4'
+
+    def test_get_value_semicolon_list(self, sample_gcode: Path):
+        """_get_value should return first value from semicolon-separated list."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+        
+        # filament_type is "PLA;PETG" - should return first
+        value = analyzer._get_value('filament_type')
+        assert value == 'PLA'
+
+    def test_get_list_value(self, sample_gcode: Path):
+        """_get_list_value should return all values as list."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+        
+        # filament_type is "PLA;PETG"
+        values = analyzer._get_list_value('filament_type')
+        assert values == ['PLA', 'PETG']
+
+    def test_get_value_missing_key(self, sample_gcode: Path):
+        """_get_value should return default for missing key."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        analyzer.analyze()
+        
+        value = analyzer._get_value('nonexistent_key', default='fallback')
+        assert value == 'fallback'
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test _format_file_size function
+# ═══════════════════════════════════════════════════════════════
+
+class TestFormatFileSize:
+    """Tests for _format_file_size helper function."""
+
+    def test_bytes(self):
+        """Should format bytes correctly."""
+        assert _format_file_size(100) == "100 B"
+        assert _format_file_size(0) == "0 B"
+
+    def test_kilobytes(self):
+        """Should format kilobytes correctly."""
+        assert _format_file_size(1024) == "1.0 KB"
+        assert _format_file_size(2048) == "2.0 KB"
+        assert _format_file_size(1536) == "1.5 KB"
+
+    def test_megabytes(self):
+        """Should format megabytes correctly."""
+        assert _format_file_size(1048576) == "1.00 MB"
+        assert _format_file_size(10485760) == "10.00 MB"
+        assert _format_file_size(1572864) == "1.50 MB"
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test _get_file_type function
+# ═══════════════════════════════════════════════════════════════
+
+class TestGetFileType:
+    """Tests for _get_file_type helper function."""
+
+    def test_3mf_extension(self, temp_dir: Path):
+        """Should detect .3mf files."""
+        path = temp_dir / "test.3mf"
+        path.touch()
+        assert _get_file_type(path) == '3mf'
+
+    def test_3mf_uppercase(self, temp_dir: Path):
+        """Should detect .3MF files (case insensitive)."""
+        path = temp_dir / "test.3MF"
+        path.touch()
+        assert _get_file_type(path) == '3mf'
+
+    def test_gcode_extension(self, temp_dir: Path):
+        """Should detect .gcode files."""
+        path = temp_dir / "test.gcode"
+        path.touch()
+        assert _get_file_type(path) == 'gcode'
+
+    def test_gcode_uppercase(self, temp_dir: Path):
+        """Should detect .GCODE files (case insensitive)."""
+        path = temp_dir / "test.GCODE"
+        path.touch()
+        assert _get_file_type(path) == 'gcode'
+
+    def test_unknown_extension(self, temp_dir: Path):
+        """Should return 'unknown' for other extensions."""
+        path = temp_dir / "test.txt"
+        path.touch()
+        assert _get_file_type(path) == 'unknown'
+        
+        path2 = temp_dir / "test.stl"
+        path2.touch()
+        assert _get_file_type(path2) == 'unknown'
+
+
+# ═══════════════════════════════════════════════════════════════
+# Test CLI with Gcode files
+# ═══════════════════════════════════════════════════════════════
+
+class TestGcodeCLI:
+    """Tests for command-line interface with gcode files."""
+
+    def test_main_with_gcode(self, sample_gcode: Path):
+        """main() should work with a valid gcode file."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode)]):
+            main()
+
+    def test_main_gcode_json_output(self, sample_gcode: Path, capsys):
+        """--json flag should output valid JSON for gcode."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--json']):
+            main()
+        
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert 'file' in data
+        assert 'profile' in data
+        assert 'statistics' in data
+        assert 'objects' in data
+
+    def test_main_gcode_diff_mode(self, sample_gcode: Path, capsys):
+        """--diff flag should work with gcode files."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--diff']):
+            main()
+        
+        captured = capsys.readouterr()
+        assert len(captured.out) > 0
+
+    def test_main_gcode_wiki_mode(self, sample_gcode: Path):
+        """--wiki flag should work with gcode files."""
+        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--wiki']):
+            main()
+
+    def test_main_unsupported_extension(self, temp_dir: Path):
+        """main() should exit with error for unsupported file type."""
+        bad_file = temp_dir / "test.stl"
+        bad_file.write_text("some content")
+        
+        with patch.object(sys, 'argv', ['analyze.py', str(bad_file)]):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 1
+
+
+class TestPrintGcodeResults:
+    """Tests for print_gcode_results function."""
+
+    def test_print_gcode_results_basic(self, sample_gcode: Path):
+        """print_gcode_results should not raise with valid data."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        # Should not raise
+        print_gcode_results(result)
+
+    def test_print_gcode_results_diff_mode(self, sample_gcode: Path):
+        """print_gcode_results with show_diff=True should work."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        print_gcode_results(result, show_diff=True)
+
+    def test_print_gcode_results_no_color(self, sample_gcode: Path):
+        """print_gcode_results with no_color=True should work."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        print_gcode_results(result, no_color=True)
+
+    def test_print_gcode_results_wiki_mode(self, sample_gcode: Path):
+        """print_gcode_results with wiki=True should work."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        
+        print_gcode_results(result, wiki=True)
