@@ -310,20 +310,31 @@ The analyzer parses:
 
 ```text
 3mf-settings-analyzer/
-├── analyze.py          # Main CLI script (ThreeMFAnalyzer + GcodeAnalyzer)
-├── settings_wiki.py    # OrcaSlicer settings reference module
-├── tests/              # Unit tests
-│   ├── conftest.py         # Pytest fixtures (3MF + Gcode)
-│   ├── test_analyzer.py    # Tests for analyze.py
-│   └── test_settings_wiki.py  # Tests for settings_wiki.py
+├── analyze.py              # Thin entry point (calls analyzer.cli.main)
+├── analyzer/               # Core package
+│   ├── __init__.py             # Public API exports + __version__
+│   ├── constants.py            # Shared constants (SYSTEM_KEYS, BOOL_TRUE, etc.)
+│   ├── threemf.py              # ThreeMFAnalyzer class + _is_custom helper
+│   ├── gcode.py                # GcodeAnalyzer class
+│   ├── output.py               # Rich formatting: panels, tables, colors, helpers
+│   └── cli.py                  # argparse, main(), setup_logging(), _get_file_type()
+├── settings_wiki.py        # OrcaSlicer settings reference module
+├── tests/                  # Unit tests
+│   ├── conftest.py             # Pytest fixtures (3MF + Gcode)
+│   ├── test_constants.py       # Tests for analyzer.constants
+│   ├── test_threemf.py         # Tests for analyzer.threemf
+│   ├── test_gcode.py           # Tests for analyzer.gcode
+│   ├── test_output.py          # Tests for analyzer.output
+│   ├── test_cli.py             # Tests for analyzer.cli
+│   └── test_settings_wiki.py   # Tests for settings_wiki
 ├── data/
 │   ├── css3_colors.json        # W3C CSS3 named colors for color recognition
 │   └── settings_wiki.json      # Cached parsed settings metadata (auto-generated)
-├── requirements.txt    # Python dependencies
-├── README.md           # Documentation
-├── LICENSE             # MIT license
-├── .gitignore          # Git ignore rules
-└── .gitattributes      # GitHub linguist overrides
+├── requirements.txt        # Python dependencies
+├── README.md               # Documentation
+├── LICENSE                 # MIT license
+├── .gitignore              # Git ignore rules
+└── .gitattributes          # GitHub linguist overrides
 ```
 
 ## Requirements
