@@ -32,7 +32,8 @@ A command-line tool that extracts and displays print settings from **3MF** and *
 
 - **JSON export** -- raw structured data output for scripting and automation
 - **Wiki links** -- clickable hyperlinks to [OrcaSlicer wiki](https://github.com/OrcaSlicer/OrcaSlicer/wiki) for each setting (`--wiki`). Reference data is auto-downloaded on first use (~1 MB) and cached locally for subsequent runs
-- **Colored terminal output** -- powered by [Rich](https://github.com/Textualize/rich)
+- **Colored terminal output** -- powered by [Rich](https://github.com/Textualize/rich) with truecolor hex display
+- **CSS3 color recognition** -- filament colors are identified by nearest match from the [W3C CSS3 Named Colors](https://www.w3.org/TR/css-color-3/#svg-color) standard (141 colors), with exact truecolor squares in the terminal
 
 ### Supported slicers
 
@@ -205,7 +206,7 @@ python3 analyze.py --update-wiki
 │   Filament Cost Per Extruder      $0.20, $0.02, $0.01                        │
 │   Filament Changes                64                                         │
 │   Filament 1                      Snapmaker PLA SnapSpeed @U1                │
-│   Filament Colors                 Red, White, Black                          │
+│   Filament Colors                 ██ Gold, ██ White, ██ Black                │
 │                                                                              │
 │   First Layer Nozzle Temp         220 C                                      │
 │   Bed Temp                        65 C                                       │
@@ -312,7 +313,8 @@ The analyzer parses:
 │   ├── test_analyzer.py    # Tests for analyze.py
 │   └── test_settings_wiki.py  # Tests for settings_wiki.py
 ├── data/
-│   └── settings_wiki.json  # Cached parsed settings metadata (auto-generated)
+│   ├── css3_colors.json        # W3C CSS3 named colors for color recognition
+│   └── settings_wiki.json      # Cached parsed settings metadata (auto-generated)
 ├── requirements.txt    # Python dependencies
 ├── README.md           # Documentation
 ├── LICENSE             # MIT license

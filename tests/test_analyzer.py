@@ -19,6 +19,8 @@ from analyze import (
     _format_file_size,
     _format_filament_list,
     _hex_to_color_name,
+    _load_css3_colors,
+    _find_nearest_css3_color,
     _get_file_type,
     main,
     print_results,
@@ -1099,105 +1101,194 @@ class TestPrintGcodeResults:
 
 
 # ═══════════════════════════════════════════════════════════════
+# Test CSS3 color data loading
+# ═══════════════════════════════════════════════════════════════
+
+class TestLoadCss3Colors:
+    """Tests for CSS3 color data loading."""
+
+    def test_loads_colors_dict(self):
+        """Should return a non-empty dict of CSS3 colors."""
+        colors = _load_css3_colors()
+        assert isinstance(colors, dict)
+        assert len(colors) > 100
+
+    def test_colors_have_rgb_values(self):
+        """Each color should have a 3-element RGB list."""
+        colors = _load_css3_colors()
+        for name, rgb in colors.items():
+            assert isinstance(rgb, list), f"{name} value is not a list"
+            assert len(rgb) == 3, f"{name} has {len(rgb)} elements, expected 3"
+            assert all(0 <= v <= 255 for v in rgb), f"{name} has out-of-range values: {rgb}"
+
+    def test_contains_basic_colors(self):
+        """Should contain standard basic color names."""
+        colors = _load_css3_colors()
+        for expected in ('Red', 'Green', 'Blue', 'Yellow', 'White', 'Black',
+                         'Orange', 'Purple', 'Pink', 'Gray', 'Cyan', 'Magenta'):
+            assert expected in colors, f"Missing basic color: {expected}"
+
+    def test_red_rgb_values(self):
+        """CSS3 Red should be [255, 0, 0]."""
+        colors = _load_css3_colors()
+        assert colors['Red'] == [255, 0, 0]
+
+    def test_caching(self):
+        """Second call should return the same object (cached)."""
+        colors1 = _load_css3_colors()
+        colors2 = _load_css3_colors()
+        assert colors1 is colors2
+
+
+class TestFindNearestCss3Color:
+    """Tests for nearest CSS3 color matching."""
+
+    def test_exact_red(self):
+        """Exact CSS3 Red (255, 0, 0) should return 'Red'."""
+        assert _find_nearest_css3_color(255, 0, 0) == 'Red'
+
+    def test_exact_blue(self):
+        """Exact CSS3 Blue (0, 0, 255) should return 'Blue'."""
+        assert _find_nearest_css3_color(0, 0, 255) == 'Blue'
+
+    def test_exact_yellow(self):
+        """Exact CSS3 Yellow (255, 255, 0) should return 'Yellow'."""
+        assert _find_nearest_css3_color(255, 255, 0) == 'Yellow'
+
+    def test_exact_black(self):
+        """Exact CSS3 Black (0, 0, 0) should return 'Black'."""
+        assert _find_nearest_css3_color(0, 0, 0) == 'Black'
+
+    def test_exact_white(self):
+        """Exact CSS3 White (255, 255, 255) should return 'White'."""
+        assert _find_nearest_css3_color(255, 255, 255) == 'White'
+
+    def test_gold_amber_matches_gold(self):
+        """#F0BE02 (240, 190, 2) should match 'Gold' -- the original bug trigger."""
+        name = _find_nearest_css3_color(240, 190, 2)
+        assert name == 'Gold'
+
+    def test_near_red_matches_red_family(self):
+        """#DE1619 (222, 22, 25) should match a red-family color."""
+        name = _find_nearest_css3_color(222, 22, 25)
+        assert 'Red' in name or name == 'Crimson' or name == 'Firebrick'
+
+    def test_near_green_matches_green_family(self):
+        """#00CC00 should match a green-family color."""
+        name = _find_nearest_css3_color(0, 204, 0)
+        assert 'Green' in name or name == 'Lime' or name == 'LimeGreen'
+
+
+# ═══════════════════════════════════════════════════════════════
 # Test _hex_to_color_name function
 # ═══════════════════════════════════════════════════════════════
 
 class TestHexToColorName:
-    """Tests for _hex_to_color_name helper function."""
+    """Tests for _hex_to_color_name with CSS3 nearest-match."""
 
-    # --- Primary / high-saturation colors ---
+    # --- Exact CSS3 matches ---
 
-    def test_red(self):
-        """Pure red should return 'Red'."""
-        name, style = _hex_to_color_name('#DE1619FF')
+    def test_exact_red(self):
+        """Pure red #FF0000 should return 'Red'."""
+        name, style = _hex_to_color_name('#FF0000FF')
         assert name == 'Red'
-        assert style == 'red'
+        assert style == '#FF0000'
 
-    def test_green(self):
-        """Pure green should return 'Green'."""
-        name, style = _hex_to_color_name('#00CC00FF')
-        assert name == 'Green'
-        assert style == 'green'
-
-    def test_blue(self):
-        """Pure blue should return 'Blue'."""
+    def test_exact_blue(self):
+        """Pure blue #0000FF should return 'Blue'."""
         name, style = _hex_to_color_name('#0000FFFF')
         assert name == 'Blue'
-        assert style == 'blue'
+        assert style == '#0000FF'
 
-    def test_yellow(self):
-        """Yellow should return 'Yellow'."""
+    def test_exact_yellow(self):
+        """Pure yellow #FFFF00 should return 'Yellow'."""
         name, style = _hex_to_color_name('#FFFF00FF')
         assert name == 'Yellow'
-        assert style == 'yellow'
+        assert style == '#FFFF00'
 
-    def test_magenta(self):
-        """Magenta should return 'Magenta'."""
-        name, style = _hex_to_color_name('#FF00FFFF')
-        assert name == 'Magenta'
-        assert style == 'magenta'
-
-    def test_cyan(self):
-        """Cyan should return 'Cyan'."""
-        name, style = _hex_to_color_name('#00FFFFFF')
-        assert name == 'Cyan'
-        assert style == 'cyan'
-
-    def test_orange(self):
-        """Orange should return 'Orange'."""
-        name, style = _hex_to_color_name('#FF8000FF')
-        assert name == 'Orange'
-        assert style == 'dark_orange'
-
-    def test_purple(self):
-        """Purple should return 'Purple'."""
-        name, style = _hex_to_color_name('#9900CCFF')
-        assert name == 'Purple'
-        assert style == 'purple'
-
-    def test_brown(self):
-        """Brown-ish color should return 'Brown'."""
-        name, style = _hex_to_color_name('#A07060FF')
-        assert name == 'Brown'
-        assert style == 'orange4'
-
-    def test_pink(self):
-        """Pink should return 'Pink'."""
-        name, style = _hex_to_color_name('#FFB0B0FF')
-        assert name == 'Pink'
-        assert style == 'hot_pink'
-
-    # --- Grayscale colors ---
-
-    def test_black(self):
-        """Near-black should return 'Black'."""
+    def test_exact_black(self):
+        """Pure black #000000 should return 'Black'."""
         name, style = _hex_to_color_name('#000000FF')
         assert name == 'Black'
-        assert style == 'grey23'
+        assert style == '#000000'
 
-    def test_dark_gray(self):
-        """Dark gray should return 'Dark Gray'."""
-        name, style = _hex_to_color_name('#505050FF')
-        assert name == 'Dark Gray'
-        assert style == 'grey50'
-
-    def test_gray(self):
-        """Medium gray should return 'Gray'."""
-        name, style = _hex_to_color_name('#909090FF')
-        assert name == 'Gray'
-        assert style == 'grey70'
-
-    def test_light_gray(self):
-        """Light gray should return 'Light Gray'."""
-        name, style = _hex_to_color_name('#C8C8C8FF')
-        assert name == 'Light Gray'
-        assert style == 'grey85'
-
-    def test_white(self):
-        """Pure white should return 'White'."""
+    def test_exact_white(self):
+        """Pure white #FFFFFF should return 'White'."""
         name, style = _hex_to_color_name('#FFFFFFFF')
         assert name == 'White'
-        assert style == 'bright_white'
+        assert style == '#FFFFFF'
+
+    def test_exact_cyan(self):
+        """Exact cyan #00FFFF should return 'Cyan' or 'Aqua'."""
+        name, style = _hex_to_color_name('#00FFFFFF')
+        assert name in ('Cyan', 'Aqua')
+        assert style == '#00FFFF'
+
+    def test_exact_magenta(self):
+        """Exact magenta #FF00FF should return 'Magenta' or 'Fuchsia'."""
+        name, style = _hex_to_color_name('#FF00FFFF')
+        assert name in ('Magenta', 'Fuchsia')
+        assert style == '#FF00FF'
+
+    # --- Nearest-match (non-exact) ---
+
+    def test_gold_amber_color(self):
+        """#F0BE02 (the original bug) should return 'Gold'."""
+        name, style = _hex_to_color_name('#F0BE02FF')
+        assert name == 'Gold'
+        assert style == '#F0BE02'
+
+    def test_near_red(self):
+        """#DE1619 should match a red-family CSS3 color."""
+        name, style = _hex_to_color_name('#DE1619FF')
+        assert name == 'Crimson'
+        assert style == '#DE1619'
+
+    def test_dark_orange(self):
+        """#FF8000 should match DarkOrange."""
+        name, style = _hex_to_color_name('#FF8000FF')
+        assert name == 'DarkOrange'
+        assert style == '#FF8000'
+
+    def test_near_green(self):
+        """#00CC00 should match a green-family CSS3 color."""
+        name, style = _hex_to_color_name('#00CC00FF')
+        name_lower = name.lower()
+        assert 'green' in name_lower or name == 'Lime'
+
+    def test_near_purple(self):
+        """#9900CC should match a purple/violet-family CSS3 color."""
+        name, style = _hex_to_color_name('#9900CCFF')
+        assert name == 'DarkViolet'
+        assert style == '#9900CC'
+
+    def test_pink_shade(self):
+        """#FFB0B0 should match a pink-family CSS3 color."""
+        name, style = _hex_to_color_name('#FFB0B0FF')
+        name_lower = name.lower()
+        assert 'pink' in name_lower or 'salmon' in name_lower or 'rose' in name_lower
+
+    def test_gray_shades(self):
+        """Various grays should match gray-family CSS3 colors."""
+        name, _ = _hex_to_color_name('#808080FF')
+        assert name == 'Gray'
+
+        # #505050 is nearest to DarkSlateGray [47,79,79] by RGB distance
+        name, _ = _hex_to_color_name('#505050FF')
+        assert 'Gray' in name or 'grey' in name.lower() or 'Slate' in name
+
+        name, _ = _hex_to_color_name('#C0C0C0FF')
+        assert name == 'Silver'
+
+    # --- Style is always original hex ---
+
+    def test_style_is_hex_for_all_colors(self):
+        """Rich style should always be the original hex (truecolor)."""
+        test_cases = ['#FF0000FF', '#00FF00', '#0000FF', '#F0BE02FF', '#000000FF']
+        for hex_input in test_cases:
+            _, style = _hex_to_color_name(hex_input)
+            assert style.startswith('#'), f"Style for {hex_input} should start with #, got {style}"
+            assert len(style) == 7, f"Style for {hex_input} should be #RRGGBB format, got {style}"
 
     # --- Format variations ---
 
@@ -1205,13 +1296,14 @@ class TestHexToColorName:
         """#RRGGBB without alpha should work."""
         name, style = _hex_to_color_name('#FF0000')
         assert name == 'Red'
-        assert style == 'red'
+        assert style == '#FF0000'
 
     def test_rrggbbaa_format(self):
-        """#RRGGBBAA format should work."""
+        """#RRGGBBAA format should work (alpha ignored)."""
         name, style = _hex_to_color_name('#00FF0080')
-        assert name == 'Green'
-        assert style == 'green'
+        name_lower = name.lower()
+        assert 'green' in name_lower or name == 'Lime'
+        assert style == '#00FF00'
 
     # --- Invalid inputs ---
 
@@ -1245,12 +1337,18 @@ class TestHexToColorName:
         assert name is None
         assert style == 'white'
 
-    def test_fallback_returns_hex_code(self):
-        """Unclassifiable color should return original hex code."""
-        # A color that's not clearly in any category
-        name, style = _hex_to_color_name('#010180FF')
-        # Should fallback to hex
-        assert style == 'white'  # fallback style is always white
+    def test_every_color_gets_a_name(self):
+        """No hex color should fall through to raw hex code anymore."""
+        test_colors = [
+            '#010180FF', '#F0BE02FF', '#A07060FF', '#335577FF',
+            '#998877FF', '#AABB00FF', '#123456FF',
+        ]
+        for hex_input in test_colors:
+            name, style = _hex_to_color_name(hex_input)
+            assert not name.startswith('#'), (
+                f"Color {hex_input} returned raw hex '{name}' instead of a CSS3 name"
+            )
+            assert style.startswith('#'), f"Style should be hex, got {style}"
 
 
 # ═══════════════════════════════════════════════════════════════

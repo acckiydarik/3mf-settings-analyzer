@@ -5,7 +5,7 @@ Analyzes 3MF and Gcode files and displays slicer settings in a structured table 
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF/Gcode metadata format.
 """
 
-__version__ = "1.9.0"
+__version__ = "1.10.0"
 
 import zipfile
 import json
@@ -86,6 +86,9 @@ GCODE_HEADER_END = '; HEADER_BLOCK_END'
 GCODE_CONFIG_START = '; CONFIG_BLOCK_START'
 GCODE_CONFIG_END = '; CONFIG_BLOCK_END'
 GCODE_OBJECT_MARKER = '; printing object '
+
+# CSS3 named colors cache (loaded lazily from data/css3_colors.json)
+_css3_colors_cache: Optional[Dict[str, List[int]]] = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1118,21 +1121,81 @@ def _format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024):.2f} MB"
 
 
-def _hex_to_color_name(hex_color: str) -> Tuple[str, str]:
-    """Convert hex color (#RRGGBBAA or #RRGGBB) to approximate color name and Rich style.
-    
-    Args:
-        hex_color: Hex color string like '#DE1619FF' or '#DE1619'
-        
+def _load_css3_colors() -> Dict[str, List[int]]:
+    """Load CSS3 named colors from JSON data file (cached).
+
     Returns:
-        Tuple of (color_name, rich_style) for terminal display.
-        rich_style is a Rich color name for styling the output.
+        Dict mapping color name (Title Case) to [R, G, B] list.
+        Returns empty dict on load failure.
+    """
+    global _css3_colors_cache
+    if _css3_colors_cache is not None:
+        return _css3_colors_cache
+
+    json_path = Path(__file__).parent / "data" / "css3_colors.json"
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        _css3_colors_cache = data.get("colors", {})
+    except (OSError, json.JSONDecodeError, KeyError) as e:
+        logger.warning("Failed to load CSS3 colors from %s: %s", json_path, e)
+        _css3_colors_cache = {}
+
+    return _css3_colors_cache
+
+
+def _find_nearest_css3_color(r: int, g: int, b: int) -> str:
+    """Find the nearest CSS3 named color by Euclidean distance in RGB space.
+
+    Args:
+        r: Red component (0-255).
+        g: Green component (0-255).
+        b: Blue component (0-255).
+
+    Returns:
+        CSS3 color name in Title Case (e.g. "Goldenrod", "Crimson").
+        Returns "Unknown" if no colors are loaded.
+    """
+    colors = _load_css3_colors()
+    if not colors:
+        return "Unknown"
+
+    best_name = "Unknown"
+    best_dist = float('inf')
+
+    for name, rgb in colors.items():
+        # Squared Euclidean distance (skip sqrt -- only need ordering)
+        dist = (r - rgb[0]) ** 2 + (g - rgb[1]) ** 2 + (b - rgb[2]) ** 2
+        if dist < best_dist:
+            best_dist = dist
+            best_name = name
+            if dist == 0:
+                break  # Exact match
+
+    return best_name
+
+
+def _hex_to_color_name(hex_color: str) -> Tuple[str, str]:
+    """Convert hex color (#RRGGBBAA or #RRGGBB) to nearest CSS3 color name.
+
+    Uses the W3C CSS Color Module Level 3 named colors (141 entries) and finds
+    the nearest match by Euclidean distance in RGB space.
+
+    The Rich style returned is the original hex code (supports 24-bit truecolor),
+    giving exact color representation in the terminal.
+
+    Args:
+        hex_color: Hex color string like '#DE1619FF' or '#DE1619'.
+
+    Returns:
+        Tuple of (color_name, rich_hex_style) for terminal display.
+        color_name is the nearest CSS3 color name (e.g. "Goldenrod").
+        rich_hex_style is the original hex for Rich truecolor styling (e.g. "#DE1619").
     """
     if not hex_color or not hex_color.startswith('#'):
         return (hex_color, 'white')
-    
+
     try:
-        # Remove # and handle both #RRGGBB and #RRGGBBAA formats
         hex_str = hex_color[1:]
         if len(hex_str) >= 6:
             r = int(hex_str[0:2], 16)
@@ -1140,51 +1203,12 @@ def _hex_to_color_name(hex_color: str) -> Tuple[str, str]:
             b = int(hex_str[4:6], 16)
         else:
             return (hex_color, 'white')
-        
-        # Simple color classification based on RGB values
-        # Check for grayscale first
-        if abs(r - g) < 30 and abs(g - b) < 30 and abs(r - b) < 30:
-            avg = (r + g + b) // 3
-            if avg < 40:
-                return ('Black', 'grey23')
-            elif avg < 100:
-                return ('Dark Gray', 'grey50')
-            elif avg < 180:
-                return ('Gray', 'grey70')
-            elif avg < 230:
-                return ('Light Gray', 'grey85')
-            else:
-                return ('White', 'bright_white')
-        
-        # Determine dominant color(s)
-        max_val = max(r, g, b)
-        
-        # High saturation colors
-        if max_val > 150:
-            if r == max_val and g < 100 and b < 100:
-                return ('Red', 'red')
-            elif g == max_val and r < 100 and b < 100:
-                return ('Green', 'green')
-            elif b == max_val and r < 100 and g < 100:
-                return ('Blue', 'blue')
-            elif r > 200 and g > 200 and b < 100:
-                return ('Yellow', 'yellow')
-            elif r > 200 and b > 150 and g < 100:
-                return ('Magenta', 'magenta')
-            elif g > 200 and b > 200 and r < 100:
-                return ('Cyan', 'cyan')
-            elif r > 200 and g > 100 and g < 180 and b < 100:
-                return ('Orange', 'dark_orange')
-            elif r > 150 and b > 150 and g < 100:
-                return ('Purple', 'purple')
-            elif r > 150 and g > 100 and b > 80 and b < 150:
-                return ('Brown', 'orange4')
-            elif r > 200 and g > 150 and b > 150:
-                return ('Pink', 'hot_pink')
-        
-        # Fallback: return hex code
-        return (hex_color, 'white')
-        
+
+        color_name = _find_nearest_css3_color(r, g, b)
+        # Use #RRGGBB (without alpha) as Rich style for truecolor display
+        rich_style = f"#{hex_str[0:6]}"
+        return (color_name, rich_style)
+
     except (ValueError, IndexError):
         return (hex_color, 'white')
 
