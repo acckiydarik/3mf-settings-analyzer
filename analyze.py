@@ -5,7 +5,7 @@ Analyzes 3MF and Gcode files and displays slicer settings in a structured table 
 Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the same 3MF/Gcode metadata format.
 """
 
-__version__ = "1.10.0"
+__version__ = "1.11.0"
 
 import zipfile
 import json
@@ -1006,8 +1006,8 @@ def _print_profile_panel(console: Console, profile: Dict[str, Any]):
         for i, f in enumerate(filaments):
             profile_table.add_row(f"Filament {i+1}", f"[magenta]{f}[/magenta]")
     
-    console.print(Panel(profile_table, title="[bold bright_yellow]PROFILE[/bold bright_yellow]",
-                        border_style="grey50", box=box.ROUNDED))
+    console.rule("[bold bright_yellow]PROFILE[/bold bright_yellow]", style="grey50")
+    console.print(Panel(profile_table, border_style="grey50", box=box.ROUNDED))
 
 
 def _print_global_settings(console: Console, profile: Dict[str, Any], wiki_label):
@@ -1094,8 +1094,8 @@ def _print_global_settings(console: Console, profile: Dict[str, Any], wiki_label
         gs.add_row("", "")
         gs.add_row("[dim]Features[/dim]", f"[bright_cyan]{', '.join(flags)}[/bright_cyan]")
     
-    console.print(Panel(gs, title="[bold bright_yellow]GLOBAL SETTINGS[/bold bright_yellow]",
-                        border_style="grey50", box=box.ROUNDED))
+    console.rule("[bold bright_yellow]GLOBAL SETTINGS[/bold bright_yellow]", style="grey50")
+    console.print(Panel(gs, border_style="grey50", box=box.ROUNDED))
 
 
 def _print_custom_global(console: Console, custom: Dict[str, Any], wiki_key):
@@ -1106,9 +1106,9 @@ def _print_custom_global(console: Console, custom: Dict[str, Any], wiki_key):
     custom_table.add_column("Value", style="white")
     for k, v in custom.items():
         custom_table.add_row(f"* {wiki_key(k)}", escape(str(v)))
-    console.print(Panel(custom_table,
-                        title="[bold bright_red]CUSTOM GLOBAL SETTINGS[/bold bright_red] [grey50](changed from profile)[/grey50]",
-                        border_style="grey50", box=box.ROUNDED))
+    console.rule("[bold bright_yellow]CUSTOM GLOBAL SETTINGS[/bold bright_yellow] [bold bright_red](changed from profile)[/bold bright_red]",
+                 style="grey50")
+    console.print(Panel(custom_table, border_style="grey50", box=box.ROUNDED))
 
 
 def _format_file_size(size_bytes: int) -> str:
@@ -1392,9 +1392,8 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
     if statistics.get('bed_temp'):
         stats_table.add_row("Bed Temp", f"[red]{statistics['bed_temp']}°C[/red]")
     
-    console.print(Panel(stats_table,
-                        title="[bold bright_yellow]STATISTICS[/bold bright_yellow]",
-                        border_style="grey50", box=box.ROUNDED))
+    console.rule("[bold bright_yellow]STATISTICS[/bold bright_yellow]", style="grey50")
+    console.print(Panel(stats_table, border_style="grey50", box=box.ROUNDED))
 
 
 def _print_objects_table_gcode(console: Console, objects: List[str]):
