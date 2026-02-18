@@ -20,12 +20,12 @@ class TestCLI:
 
     def test_main_with_file(self, sample_3mf: Path):
         """main() should work with a valid 3MF file."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf)]):
             main()
 
     def test_main_json_output(self, sample_3mf: Path, capsys):
         """--json flag should output valid JSON."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--json']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), '--json']):
             main()
 
         captured = capsys.readouterr()
@@ -36,7 +36,7 @@ class TestCLI:
 
     def test_main_diff_mode(self, sample_3mf: Path, capsys):
         """--diff flag should not cause errors."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--diff']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), '--diff']):
             main()
 
         captured = capsys.readouterr()
@@ -44,22 +44,22 @@ class TestCLI:
 
     def test_main_no_color(self, sample_3mf: Path):
         """--no-color flag should work without errors."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--no-color']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), '--no-color']):
             main()
 
     def test_main_wiki_mode(self, sample_3mf: Path):
         """--wiki flag should work without errors."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--wiki']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), '--wiki']):
             main()
 
     def test_main_verbose_mode(self, sample_3mf: Path):
         """--verbose flag should enable debug logging."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--verbose']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), '--verbose']):
             main()
 
     def test_main_combined_flags(self, sample_3mf: Path, capsys):
         """Multiple flags should work together."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), '--diff', '--wiki', '--no-color']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), '--diff', '--wiki', '--no-color']):
             main()
 
         captured = capsys.readouterr()
@@ -67,7 +67,7 @@ class TestCLI:
 
     def test_main_missing_file_exits(self):
         """main() should exit with error if no file provided."""
-        with patch.object(sys, 'argv', ['analyze.py']):
+        with patch.object(sys, 'argv', ['3mf-analyzer']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code != 0
@@ -75,7 +75,7 @@ class TestCLI:
     def test_main_nonexistent_file_exits(self, temp_dir: Path):
         """main() should exit with error for non-existent file."""
         fake_path = temp_dir / "does_not_exist.3mf"
-        with patch.object(sys, 'argv', ['analyze.py', str(fake_path)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(fake_path)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
@@ -85,7 +85,7 @@ class TestCLI:
         bad_file = temp_dir / "bad.3mf"
         bad_file.write_text("not a zip")
 
-        with patch.object(sys, 'argv', ['analyze.py', str(bad_file)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(bad_file)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
@@ -93,7 +93,7 @@ class TestCLI:
     def test_main_version_output(self, capsys):
         """--version flag should print version and exit."""
         from core import __version__
-        with patch.object(sys, 'argv', ['analyze.py', '--version']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--version']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -103,21 +103,21 @@ class TestCLI:
 
     def test_main_invalid_json_exits(self, invalid_json_3mf: Path):
         """main() should exit(1) when 3MF has invalid JSON project_settings."""
-        with patch.object(sys, 'argv', ['analyze.py', str(invalid_json_3mf)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(invalid_json_3mf)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
 
     def test_main_invalid_xml_exits(self, invalid_xml_3mf: Path):
         """main() should exit(1) when 3MF has invalid XML model_settings."""
-        with patch.object(sys, 'argv', ['analyze.py', str(invalid_xml_3mf)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(invalid_xml_3mf)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
 
     def test_main_zip_slip_exits(self, malicious_3mf_traversal: Path):
         """main() should exit(1) when 3MF contains path traversal attack."""
-        with patch.object(sys, 'argv', ['analyze.py', str(malicious_3mf_traversal)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(malicious_3mf_traversal)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
@@ -190,12 +190,12 @@ class TestGcodeCLI:
 
     def test_main_with_gcode(self, sample_gcode: Path):
         """main() should work with a valid gcode file."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode)]):
             main()
 
     def test_main_gcode_json_output(self, sample_gcode: Path, capsys):
         """--json flag should output valid JSON for gcode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--json']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), '--json']):
             main()
 
         captured = capsys.readouterr()
@@ -207,7 +207,7 @@ class TestGcodeCLI:
 
     def test_main_gcode_diff_mode(self, sample_gcode: Path, capsys):
         """--diff flag should work with gcode files."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--diff']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), '--diff']):
             main()
 
         captured = capsys.readouterr()
@@ -215,17 +215,17 @@ class TestGcodeCLI:
 
     def test_main_gcode_wiki_mode(self, sample_gcode: Path):
         """--wiki flag should work with gcode files."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--wiki']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), '--wiki']):
             main()
 
     def test_main_gcode_no_color(self, sample_gcode: Path):
         """--no-color flag should work without errors for gcode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--no-color']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), '--no-color']):
             main()
 
     def test_main_gcode_verbose(self, sample_gcode: Path):
         """--verbose flag should work without errors for gcode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--verbose']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), '--verbose']):
             main()
 
     def test_main_unsupported_extension(self, temp_dir: Path):
@@ -233,7 +233,7 @@ class TestGcodeCLI:
         bad_file = temp_dir / "test.stl"
         bad_file.write_text("some content")
 
-        with patch.object(sys, 'argv', ['analyze.py', str(bad_file)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(bad_file)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
@@ -248,7 +248,7 @@ class TestGcodeCLICombinedFlags:
 
     def test_main_gcode_combined_flags(self, sample_gcode: Path, capsys):
         """Multiple flags should work together for gcode files."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--diff', '--wiki', '--no-color']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), '--diff', '--wiki', '--no-color']):
             main()
 
         captured = capsys.readouterr()
@@ -256,7 +256,7 @@ class TestGcodeCLICombinedFlags:
 
     def test_main_gcode_json_verbose(self, sample_gcode: Path, capsys):
         """--json and --verbose should work together for gcode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), '--json', '--verbose']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), '--json', '--verbose']):
             main()
 
         captured = capsys.readouterr()
@@ -274,7 +274,7 @@ class TestWikiUpdateCLI:
 
     def test_update_wiki_success(self):
         """--update-wiki should call wiki update and exit 0."""
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--update-wiki']), \
              patch('core.settings_wiki.update', return_value=True):
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -282,7 +282,7 @@ class TestWikiUpdateCLI:
 
     def test_update_wiki_already_up_to_date(self):
         """--update-wiki should handle 'already up to date' case."""
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--update-wiki']), \
              patch('core.settings_wiki.update', return_value=False):
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -290,7 +290,7 @@ class TestWikiUpdateCLI:
 
     def test_update_wiki_failure_exits_1(self):
         """--update-wiki should exit(1) if update raises an exception."""
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--update-wiki']), \
              patch('core.settings_wiki.update', side_effect=RuntimeError("Network error")):
             with pytest.raises(SystemExit) as exc_info:
                 main()

@@ -512,9 +512,9 @@ class TestCLIUpdateWiki:
 
     def test_update_wiki_flag(self):
         """--update-wiki should call settings_wiki.update()."""
-        from analyze import main
+        from core.cli import main
         
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--update-wiki']), \
              patch('core.settings_wiki.update') as mock_update:
             
             mock_update.return_value = True
@@ -528,9 +528,9 @@ class TestCLIUpdateWiki:
 
     def test_force_update_wiki_flag(self):
         """--force-update-wiki should call settings_wiki.update(force=True)."""
-        from analyze import main
+        from core.cli import main
         
-        with patch.object(sys, 'argv', ['analyze.py', '--force-update-wiki']), \
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--force-update-wiki']), \
              patch('core.settings_wiki.update') as mock_update:
             
             mock_update.return_value = True
@@ -543,9 +543,9 @@ class TestCLIUpdateWiki:
 
     def test_update_wiki_already_up_to_date(self, capsys):
         """--update-wiki should report if already up to date."""
-        from analyze import main
+        from core.cli import main
         
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--update-wiki']), \
              patch('core.settings_wiki.update') as mock_update:
             
             mock_update.return_value = False  # Already up to date
@@ -558,9 +558,9 @@ class TestCLIUpdateWiki:
 
     def test_update_wiki_error_handling(self, capsys):
         """--update-wiki should handle errors gracefully."""
-        from analyze import main
+        from core.cli import main
         
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+        with patch.object(sys, 'argv', ['3mf-analyzer', '--update-wiki']), \
              patch('core.settings_wiki.update') as mock_update:
             
             mock_update.side_effect = Exception('Network error')

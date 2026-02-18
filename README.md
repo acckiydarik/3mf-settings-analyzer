@@ -66,20 +66,26 @@ Works with 3MF and Gcode files produced by:
 ```bash
 git clone https://github.com/acckiydarik/3mf-settings-analyzer.git
 cd 3mf-settings-analyzer
-pip install -r requirements.txt
+pip install -e .
 ```
+
+This installs a `3mf-analyzer` command available from any directory.
+
+> Without `pip install`, you can run directly via `python3 3mf_analyzer.py` from the project root.
 
 ### Quick start
 
 ```bash
-python3 analyze.py model.3mf
-python3 analyze.py model.gcode
+3mf-analyzer model.3mf
+3mf-analyzer model.gcode
 ```
 
 ## Usage
 
+All examples below assume installation via `pip install -e .`.
+
 ```bash
-python3 analyze.py <file> [file2 ...] [options]
+3mf-analyzer <file> [file2 ...] [options]
 ```
 
 ### Options
@@ -101,55 +107,55 @@ python3 analyze.py <file> [file2 ...] [options]
 Analyze a 3MF file:
 
 ```bash
-python3 analyze.py model.3mf
+3mf-analyzer model.3mf
 ```
 
 Analyze a Gcode file:
 
 ```bash
-python3 analyze.py model.gcode
+3mf-analyzer model.gcode
 ```
 
 Show differences between custom and default values:
 
 ```bash
-python3 analyze.py model.3mf --diff
+3mf-analyzer model.3mf --diff
 ```
 
 Export structured data as JSON:
 
 ```bash
-python3 analyze.py model.gcode --json
+3mf-analyzer model.gcode --json
 ```
 
 With clickable wiki links on setting names:
 
 ```bash
-python3 analyze.py model.3mf --wiki
+3mf-analyzer model.3mf --wiki
 ```
 
 Save plain-text output to a file:
 
 ```bash
-python3 analyze.py model.3mf --no-color > report.txt
+3mf-analyzer model.3mf --no-color > report.txt
 ```
 
 Compare two Gcode files side by side:
 
 ```bash
-python3 analyze.py file1.gcode file2.gcode
+3mf-analyzer file1.gcode file2.gcode
 ```
 
 Compare up to four files (same type):
 
 ```bash
-python3 analyze.py a.3mf b.3mf c.3mf d.3mf
+3mf-analyzer a.3mf b.3mf c.3mf d.3mf
 ```
 
 Update wiki data from OrcaSlicer GitHub:
 
 ```bash
-python3 analyze.py --update-wiki
+3mf-analyzer --update-wiki
 ```
 
 ## Output Overview
@@ -379,16 +385,18 @@ The analyzer parses:
 
 ```text
 3mf-settings-analyzer/
-├── analyze.py              # Thin entry point (calls core.cli.main)
+├── 3mf_analyzer.py         # Thin entry point (calls core.cli.main)
+├── pyproject.toml          # Package metadata, dependencies, CLI entry point
 ├── core/                   # Core package
 │   ├── __init__.py             # Public API exports + __version__
 │   ├── constants.py            # Shared constants (SYSTEM_KEYS, BOOL_TRUE, etc.)
+│   ├── field_defs.py           # Shared field definitions for output + compare
 │   ├── threemf.py              # ThreeMFAnalyzer class + _is_custom helper
 │   ├── gcode.py                # GcodeAnalyzer class
 │   ├── output.py               # Rich formatting: panels, tables, colors, helpers
 │   ├── compare.py              # Side-by-side comparison for 2-4 files with diff highlighting
 │   ├── cli.py                  # argparse, main(), multi-file routing, setup_logging()
-│   └── settings_wiki.py       # OrcaSlicer settings reference module
+│   └── settings_wiki.py        # OrcaSlicer settings reference module
 ├── tests/                  # Unit tests
 │   ├── conftest.py             # Pytest fixtures (3MF + Gcode)
 │   ├── test_constants.py       # Tests for core.constants
@@ -422,10 +430,10 @@ Contributions are welcome. If you found a bug or have a feature request, please 
 
 ### Running Tests
 
-Install development dependencies and run the test suite:
+Install in editable mode with dev dependencies and run the test suite:
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 pytest tests/ -v
 ```
 

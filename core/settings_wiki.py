@@ -10,7 +10,7 @@ Usage:
         from core.settings_wiki import get_wiki_url, get_setting_info
 
     Update wiki data:
-        python analyze.py --update-wiki
+        3mf-analyzer --update-wiki
 """
 
 import hashlib
@@ -80,7 +80,7 @@ def _get_data_dir() -> Path:
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         # Running as PyInstaller bundle
         return Path(sys._MEIPASS) / "data"
-    return Path(__file__).parent / "data"
+    return Path(__file__).resolve().parent.parent / "data"
 
 _DATA_DIR = _get_data_dir()
 _JSON_PATH = _DATA_DIR / "settings_wiki.json"
@@ -307,11 +307,11 @@ def _build_settings_data() -> dict:
     config_path = _DATA_DIR / "PrintConfig.cpp"
 
     if not tab_path.exists():
-        logger.error("Tab.cpp not found in %s. Run 'python analyze.py --update-wiki' to download.", _DATA_DIR)
+        logger.error("Tab.cpp not found in %s. Run '3mf-analyzer --update-wiki' to download.", _DATA_DIR)
         return {"_meta": {}, "settings": {}}
 
     if not config_path.exists():
-        logger.error("PrintConfig.cpp not found in %s. Run 'python analyze.py --update-wiki' to download.", _DATA_DIR)
+        logger.error("PrintConfig.cpp not found in %s. Run '3mf-analyzer --update-wiki' to download.", _DATA_DIR)
         return {"_meta": {}, "settings": {}}
 
     # Read source files
@@ -574,7 +574,7 @@ def _load_cache() -> dict:
             logger.error("Failed to load settings_wiki.json: %s", e)
             logger.warning(
                 "Wiki links will be unavailable. "
-                "Run 'python analyze.py --update-wiki' to fix."
+                "Run '3mf-analyzer --update-wiki' to fix."
             )
             _cache = {"_meta": {}, "settings": {}}
 

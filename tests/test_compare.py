@@ -13,13 +13,12 @@ from core.compare import (
     DIFF_BG,
     _add_row,
     _add_separator,
-    _get_features,
-    _get_flow_value,
     _make_table,
     print_3mf_comparison,
     print_gcode_comparison,
 )
 from core.cli import main
+from core.field_defs import _flow_label, _fmt_flow_ratio, _fmt_features
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -114,30 +113,30 @@ class TestAddSeparator:
 # ═══════════════════════════════════════════════════════════════
 
 class TestGetFlowValue:
-    """Tests for _get_flow_value helper."""
+    """Tests for _flow_label and _fmt_flow_ratio helpers."""
 
     def test_print_flow_ratio(self):
         profile = {'print_flow_ratio': '0.95', 'filament_flow_ratio': ''}
-        label, value = _get_flow_value(profile)
+        label, _ = _flow_label(profile)
         assert label == "Print Flow Ratio"
-        assert value == "95%"
+        assert _fmt_flow_ratio(profile) == "95%"
 
     def test_filament_flow_ratio_fallback(self):
         profile = {'print_flow_ratio': '1', 'filament_flow_ratio': '0.966'}
-        label, value = _get_flow_value(profile)
+        label, _ = _flow_label(profile)
         assert label == "Filament Flow Ratio"
-        assert value == "0.966"
+        assert _fmt_flow_ratio(profile) == "0.966"
 
     def test_no_flow_ratio(self):
         profile = {'print_flow_ratio': '', 'filament_flow_ratio': ''}
-        label, value = _get_flow_value(profile)
+        label, _ = _flow_label(profile)
         assert label == ""
-        assert value == ""
+        assert _fmt_flow_ratio(profile) == ""
 
     def test_print_flow_ratio_one_uses_filament(self):
         """print_flow_ratio == '1' should fall through to filament_flow_ratio."""
         profile = {'print_flow_ratio': '1', 'filament_flow_ratio': '0.98'}
-        label, value = _get_flow_value(profile)
+        label, _ = _flow_label(profile)
         assert label == "Filament Flow Ratio"
 
 
@@ -146,7 +145,7 @@ class TestGetFlowValue:
 # ═══════════════════════════════════════════════════════════════
 
 class TestGetFeatures:
-    """Tests for _get_features helper."""
+    """Tests for _fmt_features helper."""
 
     def test_no_features(self):
         profile = {
@@ -154,7 +153,7 @@ class TestGetFeatures:
             'enable_overhang_speed': '0',
             'timelapse_type': '0',
         }
-        assert _get_features(profile) == ""
+        assert _fmt_features(profile) == ""
 
     def test_arc_fitting_enabled(self):
         profile = {
@@ -162,7 +161,7 @@ class TestGetFeatures:
             'enable_overhang_speed': '0',
             'timelapse_type': '0',
         }
-        result = _get_features(profile)
+        result = _fmt_features(profile)
         assert "Enable Arc Fitting" in result
 
     def test_overhang_speed_enabled(self):
@@ -171,7 +170,7 @@ class TestGetFeatures:
             'enable_overhang_speed': '1',
             'timelapse_type': '0',
         }
-        result = _get_features(profile)
+        result = _fmt_features(profile)
         assert "Enable Overhang Speed" in result
 
     def test_multiple_features(self):
@@ -180,13 +179,13 @@ class TestGetFeatures:
             'enable_overhang_speed': '1',
             'timelapse_type': '0',
         }
-        result = _get_features(profile)
+        result = _fmt_features(profile)
         assert "Enable Arc Fitting" in result
         assert "Enable Overhang Speed" in result
 
     def test_missing_keys_handled(self):
         """Should handle missing keys gracefully."""
-        assert _get_features({}) == ""
+        assert _fmt_features({}) == ""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -700,21 +699,21 @@ class TestCLIComparison:
 
     def test_two_gcode_files(self, sample_gcode: Path, capsys):
         """Two gcode files should trigger comparison mode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), str(sample_gcode)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), str(sample_gcode)]):
             main()
         captured = capsys.readouterr()
         assert "COMPARISON" in captured.out
 
     def test_two_3mf_files(self, sample_3mf: Path, capsys):
         """Two 3MF files should trigger comparison mode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), str(sample_3mf)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), str(sample_3mf)]):
             main()
         captured = capsys.readouterr()
         assert "COMPARISON" in captured.out
 
     def test_single_file_no_comparison(self, sample_gcode: Path, capsys):
         """Single file should use normal single-file mode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode)]):
             main()
         captured = capsys.readouterr()
         assert "GCODE SETTINGS ANALYZER" in captured.out
@@ -723,21 +722,21 @@ class TestCLIComparison:
     def test_more_than_four_files_exits(self, sample_gcode: Path):
         """More than 4 files should exit with error."""
         files = [str(sample_gcode)] * 5
-        with patch.object(sys, 'argv', ['analyze.py'] + files):
+        with patch.object(sys, 'argv', ['3mf-analyzer'] + files):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
 
     def test_mixed_types_exits(self, sample_3mf: Path, sample_gcode: Path):
         """Mixing .3mf and .gcode files should exit with error."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_3mf), str(sample_gcode)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_3mf), str(sample_gcode)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
 
     def test_json_comparison_outputs_array(self, sample_gcode: Path, capsys):
         """--json with comparison should output a JSON array."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), str(sample_gcode), '--json']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), str(sample_gcode), '--json']):
             main()
         captured = capsys.readouterr()
         data = json.loads(captured.out)
@@ -749,7 +748,7 @@ class TestCLIComparison:
 
     def test_no_files_exits(self):
         """No files provided should exit with error."""
-        with patch.object(sys, 'argv', ['analyze.py']):
+        with patch.object(sys, 'argv', ['3mf-analyzer']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code != 0
@@ -757,35 +756,35 @@ class TestCLIComparison:
     def test_nonexistent_file_in_comparison_exits(self, sample_gcode: Path, temp_dir: Path):
         """A non-existent file in the list should exit with error."""
         fake = temp_dir / "nonexistent.gcode"
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), str(fake)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), str(fake)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
 
     def test_three_gcode_files(self, sample_gcode: Path, capsys):
         """Three gcode files should trigger comparison mode."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), str(sample_gcode), str(sample_gcode)]):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), str(sample_gcode), str(sample_gcode)]):
             main()
         captured = capsys.readouterr()
         assert "COMPARISON" in captured.out
 
     def test_four_gcode_files(self, sample_gcode: Path, capsys):
         """Four gcode files should trigger comparison mode (max allowed)."""
-        with patch.object(sys, 'argv', ['analyze.py'] + [str(sample_gcode)] * 4):
+        with patch.object(sys, 'argv', ['3mf-analyzer'] + [str(sample_gcode)] * 4):
             main()
         captured = capsys.readouterr()
         assert "COMPARISON" in captured.out
 
     def test_comparison_with_no_color(self, sample_gcode: Path, capsys):
         """Comparison with --no-color should work."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), str(sample_gcode), '--no-color']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), str(sample_gcode), '--no-color']):
             main()
         captured = capsys.readouterr()
         assert "COMPARISON" in captured.out
 
     def test_comparison_with_wiki(self, sample_gcode: Path, capsys):
         """Comparison with --wiki should work."""
-        with patch.object(sys, 'argv', ['analyze.py', str(sample_gcode), str(sample_gcode), '--wiki']):
+        with patch.object(sys, 'argv', ['3mf-analyzer', str(sample_gcode), str(sample_gcode), '--wiki']):
             main()
         captured = capsys.readouterr()
         assert "COMPARISON" in captured.out

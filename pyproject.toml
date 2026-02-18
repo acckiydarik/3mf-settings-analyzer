@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "3mf-settings-analyzer"
+dynamic = ["version"]
+description = "CLI tool for extracting print settings from 3MF and Gcode files"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = [
+    "rich>=13.0.0",
+    "defusedxml>=0.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+3mf-analyzer = "core.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "core.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["core*"]

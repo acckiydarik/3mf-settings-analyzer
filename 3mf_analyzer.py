@@ -3,8 +3,8 @@
 3MF Settings Analyzer -- entry point.
 
 Run directly:
-    ./analyze.py model.3mf
-    python analyze.py model.gcode --diff
+    ./3mf_analyzer.py model.3mf
+    python3 3mf_analyzer.py model.gcode --diff
 """
 
 from core.cli import main

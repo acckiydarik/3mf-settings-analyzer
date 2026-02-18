@@ -167,16 +167,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python analyze.py model.3mf
-  python analyze.py model.gcode
-  python analyze.py model.3mf --diff
-  python analyze.py model.3mf --json
-  python analyze.py model.3mf --verbose
-  python analyze.py model.3mf --wiki
-  python analyze.py model.3mf --no-color > output.txt
-  python analyze.py file1.gcode file2.gcode
-  python analyze.py a.gcode b.gcode c.gcode d.gcode
-  python analyze.py --update-wiki
+  3mf-analyzer model.3mf
+  3mf-analyzer model.gcode
+  3mf-analyzer model.3mf --diff
+  3mf-analyzer model.3mf --json
+  3mf-analyzer model.3mf --verbose
+  3mf-analyzer model.3mf --wiki
+  3mf-analyzer model.3mf --no-color > output.txt
+  3mf-analyzer file1.gcode file2.gcode
+  3mf-analyzer a.gcode b.gcode c.gcode d.gcode
+  3mf-analyzer --update-wiki
 """
     )
     parser.add_argument('files', nargs='*', help='Path to 3MF or Gcode file(s). Pass 2-4 files for comparison mode.')
