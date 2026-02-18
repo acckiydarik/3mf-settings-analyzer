@@ -66,10 +66,12 @@ Works with 3MF and Gcode files produced by:
 ```bash
 git clone https://github.com/acckiydarik/3mf-settings-analyzer.git
 cd 3mf-settings-analyzer
-pip install -e .
+pip install .
 ```
 
 This installs a `3mf-analyzer` command available from any directory.
+
+For development, use editable mode (`pip install -e .`) so code changes take effect immediately.
 
 > Without `pip install`, you can run directly via `python3 3mf_analyzer.py` from the project root.
 
@@ -82,7 +84,7 @@ This installs a `3mf-analyzer` command available from any directory.
 
 ## Usage
 
-All examples below assume installation via `pip install -e .`.
+All examples below assume installation via `pip install .`.
 
 ```bash
 3mf-analyzer <file> [file2 ...] [options]
@@ -385,35 +387,38 @@ The analyzer parses:
 
 ```text
 3mf-settings-analyzer/
-├── 3mf_analyzer.py         # Thin entry point (calls core.cli.main)
-├── pyproject.toml          # Package metadata, dependencies, CLI entry point
-├── core/                   # Core package
-│   ├── __init__.py             # Public API exports + __version__
-│   ├── constants.py            # Shared constants (SYSTEM_KEYS, BOOL_TRUE, etc.)
-│   ├── field_defs.py           # Shared field definitions for output + compare
-│   ├── threemf.py              # ThreeMFAnalyzer class + _is_custom helper
-│   ├── gcode.py                # GcodeAnalyzer class
-│   ├── output.py               # Rich formatting: panels, tables, colors, helpers
-│   ├── compare.py              # Side-by-side comparison for 2-4 files with diff highlighting
-│   ├── cli.py                  # argparse, main(), multi-file routing, setup_logging()
-│   └── settings_wiki.py        # OrcaSlicer settings reference module
-├── tests/                  # Unit tests
-│   ├── conftest.py             # Pytest fixtures (3MF + Gcode)
-│   ├── test_constants.py       # Tests for core.constants
-│   ├── test_threemf.py         # Tests for core.threemf
-│   ├── test_gcode.py           # Tests for core.gcode
-│   ├── test_output.py          # Tests for core.output
-│   ├── test_cli.py             # Tests for core.cli
-│   ├── test_compare.py         # Tests for core.compare (comparison mode)
-│   └── test_settings_wiki.py   # Tests for settings_wiki
-├── data/
-│   ├── css3_colors.json        # W3C CSS3 named colors for color recognition
-│   └── settings_wiki.json      # Cached parsed settings metadata (auto-generated)
-├── requirements.txt        # Python dependencies
-├── README.md               # Documentation
-├── LICENSE                 # MIT license
-├── .gitignore              # Git ignore rules
-└── .gitattributes          # GitHub linguist overrides
+├── 3mf_analyzer.py             # Thin entry point (calls core.cli.main)
+├── pyproject.toml              # Package metadata, dependencies, CLI entry point
+├── requirements.txt            # Python dependencies
+├── requirements-dev.txt        # Dev dependencies (pytest, coverage)
+├── core/                       # Core package
+│   ├── __init__.py                 # Public API exports
+│   ├── _version.py                 # Single source of truth for __version__
+│   ├── constants.py                # Shared constants (SYSTEM_KEYS, BOOL_TRUE, etc.)
+│   ├── field_defs.py               # Shared field definitions for output + compare
+│   ├── threemf.py                  # ThreeMFAnalyzer class + _is_custom helper
+│   ├── gcode.py                    # GcodeAnalyzer class
+│   ├── output.py                   # Rich formatting: panels, tables, colors, helpers
+│   ├── compare.py                  # Side-by-side comparison for 2-4 files with diff highlighting
+│   ├── cli.py                      # argparse, main(), multi-file routing, setup_logging()
+│   ├── settings_wiki.py            # OrcaSlicer settings reference module
+│   └── data/                       # Package data (included in pip install)
+│       ├── css3_colors.json            # W3C CSS3 named colors for color recognition
+│       └── settings_wiki.json          # Cached settings metadata (auto-generated via --update-wiki)
+├── tests/                      # Unit tests
+│   ├── __init__.py
+│   ├── conftest.py                 # Pytest fixtures (3MF + Gcode)
+│   ├── test_constants.py           # Tests for core.constants
+│   ├── test_threemf.py             # Tests for core.threemf
+│   ├── test_gcode.py               # Tests for core.gcode
+│   ├── test_output.py              # Tests for core.output
+│   ├── test_cli.py                 # Tests for core.cli
+│   ├── test_compare.py             # Tests for core.compare (comparison mode)
+│   └── test_settings_wiki.py       # Tests for settings_wiki
+├── README.md                   # Documentation
+├── LICENSE                     # MIT license
+├── .gitignore                  # Git ignore rules
+└── .gitattributes              # GitHub linguist overrides
 ```
 
 ## Requirements

@@ -11,7 +11,7 @@ from xml.etree.ElementTree import ParseError
 
 from rich.console import Console
 
-from core import __version__
+from core._version import __version__
 from core.constants import FILE_EXTENSION_3MF, FILE_EXTENSION_GCODE
 from core.gcode import GcodeAnalyzer
 from core.output import print_gcode_results, print_results

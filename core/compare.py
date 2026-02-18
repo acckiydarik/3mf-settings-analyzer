@@ -19,8 +19,6 @@ from core.field_defs import (
     STATISTICS_FIELDS,
 )
 from core.output import (
-    _format_file_size,
-    _format_filament_list,
     _hex_to_color_name,
     _make_wiki_helpers,
 )

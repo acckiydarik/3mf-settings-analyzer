@@ -89,7 +89,7 @@ def _load_css3_colors() -> Dict[str, List[int]]:
     if _css3_colors_cache is not None:
         return _css3_colors_cache
 
-    json_path = Path(__file__).parent.parent / "data" / "css3_colors.json"
+    json_path = Path(__file__).parent / "data" / "css3_colors.json"
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -173,24 +173,6 @@ def _hex_to_color_name(hex_color: str) -> Tuple[str, str]:
 # ═══════════════════════════════════════════════════════════════
 # Formatting helpers
 # ═══════════════════════════════════════════════════════════════
-
-def _format_file_size(size_bytes: int) -> str:
-    """Format file size in human-readable format."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.2f} MB"
-
-
-def _format_filament_list(values: List[Any], suffix: str = '') -> str:
-    """Format list of filament values (per extruder)."""
-    if not values:
-        return ''
-    if len(values) == 1:
-        return f"{values[0]}{suffix}"
-    return ', '.join(f"{v}{suffix}" for v in values)
 
 
 def _format_object_value(val, is_custom: bool, default, show_diff: bool) -> str:
@@ -356,7 +338,6 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
     stats_table.add_column("Key", style="dim", width=SINGLE_LABEL_WIDTH)
     stats_table.add_column("Value", style="white")
 
-    noop_label = lambda label, key: label
     for field in STATISTICS_FIELDS:
         if field is None:
             stats_table.add_row("", "")

@@ -5,10 +5,9 @@ from pathlib import Path
 import pytest
 
 from core.gcode import GcodeAnalyzer
+from core.field_defs import _fmt_file_size, _fmt_filament_list
 from core.output import (
     _find_nearest_css3_color,
-    _format_file_size,
-    _format_filament_list,
     _format_object_value,
     _format_support_value,
     _hex_to_color_name,
@@ -146,24 +145,31 @@ class TestFormatSupportValue:
 # ═══════════════════════════════════════════════════════════════
 
 class TestFormatFileSize:
-    """Tests for _format_file_size helper function."""
+    """Tests for _fmt_file_size helper function (from field_defs)."""
 
     def test_bytes(self):
         """Should format bytes correctly."""
-        assert _format_file_size(100) == "100 B"
-        assert _format_file_size(0) == "0 B"
+        assert _fmt_file_size({'file_size_bytes': 100}) == "100 B"
+
+    def test_zero_returns_empty(self):
+        """Zero file size should return empty string."""
+        assert _fmt_file_size({'file_size_bytes': 0}) == ""
+
+    def test_missing_returns_empty(self):
+        """Missing key should return empty string."""
+        assert _fmt_file_size({}) == ""
 
     def test_kilobytes(self):
         """Should format kilobytes correctly."""
-        assert _format_file_size(1024) == "1.0 KB"
-        assert _format_file_size(2048) == "2.0 KB"
-        assert _format_file_size(1536) == "1.5 KB"
+        assert _fmt_file_size({'file_size_bytes': 1024}) == "1.0 KB"
+        assert _fmt_file_size({'file_size_bytes': 2048}) == "2.0 KB"
+        assert _fmt_file_size({'file_size_bytes': 1536}) == "1.5 KB"
 
     def test_megabytes(self):
         """Should format megabytes correctly."""
-        assert _format_file_size(1048576) == "1.00 MB"
-        assert _format_file_size(10485760) == "10.00 MB"
-        assert _format_file_size(1572864) == "1.50 MB"
+        assert _fmt_file_size({'file_size_bytes': 1048576}) == "1.00 MB"
+        assert _fmt_file_size({'file_size_bytes': 10485760}) == "10.00 MB"
+        assert _fmt_file_size({'file_size_bytes': 1572864}) == "1.50 MB"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -171,32 +177,32 @@ class TestFormatFileSize:
 # ═══════════════════════════════════════════════════════════════
 
 class TestFormatFilamentList:
-    """Tests for _format_filament_list helper function."""
+    """Tests for _fmt_filament_list helper function (from field_defs)."""
 
     def test_empty_list(self):
         """Empty list should return empty string."""
-        assert _format_filament_list([]) == ''
+        assert _fmt_filament_list([]) == ''
 
     def test_single_value(self):
         """Single value should return it without separator."""
-        assert _format_filament_list([10.5]) == '10.5'
+        assert _fmt_filament_list([10.5]) == '10.5'
 
     def test_single_value_with_suffix(self):
         """Single value with suffix should append suffix."""
-        assert _format_filament_list([10.5], ' g') == '10.5 g'
+        assert _fmt_filament_list([10.5], ' g') == '10.5 g'
 
     def test_multiple_values(self):
         """Multiple values should be comma-separated."""
-        assert _format_filament_list([1, 2, 3]) == '1, 2, 3'
+        assert _fmt_filament_list([1, 2, 3]) == '1, 2, 3'
 
     def test_multiple_values_with_suffix(self):
         """Multiple values with suffix should append suffix to each."""
-        result = _format_filament_list(['10.08', '0.87'], ' g')
+        result = _fmt_filament_list(['10.08', '0.87'], ' g')
         assert result == '10.08 g, 0.87 g'
 
     def test_string_values(self):
         """String values should be formatted correctly."""
-        result = _format_filament_list(['PLA', 'PETG'])
+        result = _fmt_filament_list(['PLA', 'PETG'])
         assert result == 'PLA, PETG'
 
 

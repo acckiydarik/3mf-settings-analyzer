@@ -73,7 +73,7 @@ venv.bak/
 *.3mf
 
 # OrcaSlicer source files (AGPL-3.0, downloaded on demand)
-data/*.cpp
+core/data/*.cpp
 
 # Local development notes
 DEVELOPMENT.md

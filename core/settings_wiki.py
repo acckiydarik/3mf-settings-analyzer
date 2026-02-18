@@ -80,7 +80,7 @@ def _get_data_dir() -> Path:
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         # Running as PyInstaller bundle
         return Path(sys._MEIPASS) / "data"
-    return Path(__file__).resolve().parent.parent / "data"
+    return Path(__file__).resolve().parent / "data"
 
 _DATA_DIR = _get_data_dir()
 _JSON_PATH = _DATA_DIR / "settings_wiki.json"
