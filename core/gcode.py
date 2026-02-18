@@ -11,6 +11,8 @@ from core.constants import (
     GCODE_CONFIG_START,
     GCODE_HEADER_END,
     GCODE_OBJECT_MARKER,
+    HEADER_LINES_LIMIT,
+    TAIL_READ_SIZE,
     build_common_profile,
 )
 
@@ -57,10 +59,10 @@ class GcodeAnalyzer:
         # Read file in chunks from the end to find CONFIG_BLOCK
         # Most gcode files have settings at the end
         with open(self.filepath, 'r', encoding='utf-8', errors='replace') as f:
-            # First, read header (first 100 lines)
+            # First, read header (first HEADER_LINES_LIMIT lines)
             header_lines = []
             for i, line in enumerate(f):
-                if i >= 100:
+                if i >= HEADER_LINES_LIMIT:
                     break
                 header_lines.append(line)
                 if line.strip() == GCODE_HEADER_END:
@@ -75,10 +77,10 @@ class GcodeAnalyzer:
                     self._extract_object_name(line)
 
             # Now find and parse CONFIG_BLOCK from end of file
-            # Read last portion of file (settings are typically in last ~50KB)
+            # Read last portion of file (settings are typically in last ~100KB)
             f.seek(0, 2)  # Go to end
             file_end = f.tell()
-            read_size = min(100000, file_end)  # Read up to 100KB from end
+            read_size = min(TAIL_READ_SIZE, file_end)
             f.seek(max(0, file_end - read_size))
 
             tail_content = f.read()

@@ -11,7 +11,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from core.constants import BOOL_TRUE, FILAMENT_COLORS, PLATE_COLORS
+from core.constants import BOOL_TRUE, FILAMENT_COLORS, PLATE_COLORS, SINGLE_LABEL_WIDTH
 from core.field_defs import (
     GLOBAL_SETTINGS_FIELDS,
     RENDER_FILAMENT_COLORS,
@@ -20,8 +20,6 @@ from core.field_defs import (
 )
 
 logger = logging.getLogger(__name__)
-
-SINGLE_LABEL_WIDTH = 31
 
 # CSS3 named colors cache (loaded lazily from data/css3_colors.json)
 _css3_colors_cache: Optional[Dict[str, List[int]]] = None

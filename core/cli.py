@@ -12,14 +12,12 @@ from xml.etree.ElementTree import ParseError
 from rich.console import Console
 
 from core._version import __version__
-from core.constants import FILE_EXTENSION_3MF, FILE_EXTENSION_GCODE
+from core.constants import FILE_EXTENSION_3MF, FILE_EXTENSION_GCODE, MAX_COMPARE_FILES
 from core.gcode import GcodeAnalyzer
 from core.output import print_gcode_results, print_results
 from core.threemf import ThreeMFAnalyzer
 
 logger = logging.getLogger(__name__)
-
-MAX_COMPARE_FILES = 4
 
 
 def setup_logging(verbose: bool = False) -> None:

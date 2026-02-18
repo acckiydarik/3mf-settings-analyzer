@@ -32,6 +32,17 @@ DEFAULT_EXTRUDER = '1'
 # Fallback for sorting when identify_id is missing or invalid
 DEFAULT_IDENTIFY_ID = 0
 
+# Parsing limits
+HEADER_LINES_LIMIT = 100  # Max lines to scan for gcode header block
+TAIL_READ_SIZE = 100_000  # Bytes to read from end of gcode file for config block
+
+# CLI limits
+MAX_COMPARE_FILES = 4  # Maximum files for comparison mode
+
+# Output formatting widths
+LABEL_WIDTH = 34  # Label column width in comparison tables
+SINGLE_LABEL_WIDTH = 31  # Label column width in single-file tables
+
 # File extensions
 FILE_EXTENSION_3MF = '.3mf'
 FILE_EXTENSION_GCODE = '.gcode'

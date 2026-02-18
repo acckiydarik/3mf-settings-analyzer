@@ -11,7 +11,7 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
-from core.constants import BOOL_TRUE
+from core.constants import BOOL_TRUE, LABEL_WIDTH
 from core.field_defs import (
     GLOBAL_SETTINGS_FIELDS,
     RENDER_FILAMENT_COLORS,
@@ -27,8 +27,6 @@ logger = logging.getLogger(__name__)
 
 # Muted yellow background for differing values (industry standard, matches git diff / VS Code)
 DIFF_BG = Style(bgcolor="rgb(80,60,10)")
-
-LABEL_WIDTH = 34
 
 
 # ═══════════════════════════════════════════════════════════════
