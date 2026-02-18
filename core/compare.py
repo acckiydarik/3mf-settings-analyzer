@@ -295,57 +295,6 @@ def _collect_children(
     return children_per_file
 
 
-def _add_object_setting_rows(
-    table: Table,
-    obj_rows: List[Any],
-    n: int,
-    settings: List[Tuple[str, str]],
-    indent: str = "  ",
-) -> None:
-    """Add standard setting rows for one object across files."""
-    for label, key in settings:
-        values = []
-        for row in obj_rows:
-            if row is None:
-                values.append("")
-            else:
-                val = row.get(key, "")
-                values.append(str(val) if val else "")
-        _add_row(table, f"[bold blue]{indent}{label}[/bold blue]", values, placeholder="[dim]--[/dim]")
-
-
-def _add_object_custom_rows(
-    table: Table,
-    obj_rows: List[Any],
-    n: int,
-    indent: str = "  ",
-) -> None:
-    """Add custom per-object settings as union rows with diff highlighting."""
-    customs = [
-        (row.get('custom_settings', {}) if row else {})
-        for row in obj_rows
-    ]
-    all_keys: List[str] = []
-    seen: set = set()
-    for c in customs:
-        for k in c:
-            if k not in seen:
-                all_keys.append(k)
-                seen.add(k)
-
-    for key in all_keys:
-        values = []
-        for c in customs:
-            val = c.get(key)
-            values.append(escape(str(val)) if val is not None else "")
-        _add_row(
-            table,
-            f"[yellow]{indent}└─ * {key}[/yellow]",
-            values,
-            placeholder="[dim]--[/dim]",
-        )
-
-
 def _add_obj_bordered_rows(
     table: Table,
     obj_rows: List[Any],
@@ -362,25 +311,7 @@ def _add_obj_bordered_rows(
             else:
                 val = row.get(key, "")
                 values.append(str(val) if val else "")
-
-        non_empty = [v for v in values if v]
-        differs = (
-            len(non_empty) > 0
-            and (len(set(non_empty)) > 1 or len(non_empty) < len(values))
-        )
-
-        cells = []
-        for v in values:
-            if v:
-                t = Text(v)
-                if differs:
-                    t.stylize(DIFF_BG)
-            else:
-                t = Text.from_markup("[dim]--[/dim]")
-                if differs:
-                    t.stylize(DIFF_BG)
-            cells.append(t)
-        table.add_row(f"[bold blue]{indent}{label}[/bold blue]", *cells)
+        _add_row(table, f"[bold blue]{indent}{label}[/bold blue]", values, placeholder="[dim]--[/dim]")
 
 
 def _add_obj_bordered_custom(
@@ -406,26 +337,13 @@ def _add_obj_bordered_custom(
         values = []
         for c in customs:
             val = c.get(key)
-            values.append(str(val) if val is not None else "")
-
-        non_empty = [v for v in values if v]
-        differs = (
-            len(non_empty) > 0
-            and (len(set(non_empty)) > 1 or len(non_empty) < len(values))
+            values.append(escape(str(val)) if val is not None else "")
+        _add_row(
+            table,
+            f"[yellow]{indent}\u2514\u2500 * {key}[/yellow]",
+            values,
+            placeholder="[dim]--[/dim]",
         )
-
-        cells = []
-        for v in values:
-            if v:
-                t = Text(v)
-                if differs:
-                    t.stylize(DIFF_BG)
-            else:
-                t = Text.from_markup("[dim]--[/dim]")
-                if differs:
-                    t.stylize(DIFF_BG)
-            cells.append(t)
-        table.add_row(f"[yellow]{indent}\u2514\u2500 * {key}[/yellow]", *cells)
 
 
 def _print_compare_objects_3mf(

@@ -28,14 +28,15 @@ from core.field_defs import _flow_label, _fmt_flow_ratio, _fmt_features
 class TestMakeTable:
     """Tests for _make_table helper."""
 
-    def test_creates_table_with_correct_column_count(self):
+    @pytest.mark.parametrize("n_files, expected_columns", [
+        (2, 3),
+        (3, 4),
+        (4, 5),
+    ])
+    def test_creates_table_with_correct_column_count(self, n_files, expected_columns):
         """Table should have 1 label + N file columns."""
-        table = _make_table(2)
-        assert len(table.columns) == 3
-
-    def test_creates_table_for_four_files(self):
-        table = _make_table(4)
-        assert len(table.columns) == 5
+        table = _make_table(n_files)
+        assert len(table.columns) == expected_columns
 
     def test_label_column_has_dim_style(self):
         table = _make_table(2)
@@ -115,29 +116,20 @@ class TestAddSeparator:
 class TestGetFlowValue:
     """Tests for _flow_label and _fmt_flow_ratio helpers."""
 
-    def test_print_flow_ratio(self):
-        profile = {'print_flow_ratio': '0.95', 'filament_flow_ratio': ''}
+    @pytest.mark.parametrize("profile, expected_label, expected_value", [
+        ({'print_flow_ratio': '0.95', 'filament_flow_ratio': ''},
+         "Print Flow Ratio", "95%"),
+        ({'print_flow_ratio': '1', 'filament_flow_ratio': '0.966'},
+         "Filament Flow Ratio", "0.966"),
+        ({'print_flow_ratio': '', 'filament_flow_ratio': ''},
+         "", ""),
+        ({'print_flow_ratio': '1', 'filament_flow_ratio': '0.98'},
+         "Filament Flow Ratio", "0.98"),
+    ])
+    def test_flow_ratio(self, profile, expected_label, expected_value):
         label, _ = _flow_label(profile)
-        assert label == "Print Flow Ratio"
-        assert _fmt_flow_ratio(profile) == "95%"
-
-    def test_filament_flow_ratio_fallback(self):
-        profile = {'print_flow_ratio': '1', 'filament_flow_ratio': '0.966'}
-        label, _ = _flow_label(profile)
-        assert label == "Filament Flow Ratio"
-        assert _fmt_flow_ratio(profile) == "0.966"
-
-    def test_no_flow_ratio(self):
-        profile = {'print_flow_ratio': '', 'filament_flow_ratio': ''}
-        label, _ = _flow_label(profile)
-        assert label == ""
-        assert _fmt_flow_ratio(profile) == ""
-
-    def test_print_flow_ratio_one_uses_filament(self):
-        """print_flow_ratio == '1' should fall through to filament_flow_ratio."""
-        profile = {'print_flow_ratio': '1', 'filament_flow_ratio': '0.98'}
-        label, _ = _flow_label(profile)
-        assert label == "Filament Flow Ratio"
+        assert label == expected_label
+        assert _fmt_flow_ratio(profile) == expected_value
 
 
 # ═══════════════════════════════════════════════════════════════

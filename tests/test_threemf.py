@@ -18,29 +18,19 @@ from core.threemf import ThreeMFAnalyzer, _is_custom
 class TestIsCustom:
     """Tests for the _is_custom helper function."""
 
-    def test_none_value_returns_false(self):
-        """None object value should not be considered custom."""
-        assert _is_custom(None, "any_value") is False
-
-    def test_same_values_returns_false(self):
-        """Identical values should not be considered custom."""
-        assert _is_custom("10", "10") is False
-        assert _is_custom(10, 10) is False
-        assert _is_custom("0.2", "0.2") is False
-
-    def test_different_values_returns_true(self):
-        """Different values should be considered custom."""
-        assert _is_custom("15", "10") is True
-        assert _is_custom("0.3", "0.2") is True
-
-    def test_string_number_comparison(self):
-        """String and number with same value should match after str()."""
-        assert _is_custom(10, "10") is False
-        assert _is_custom("10", 10) is False
-
-    def test_empty_string_vs_none(self):
-        """Empty string is a valid value, not None."""
-        assert _is_custom("", "default") is True
+    @pytest.mark.parametrize("obj_val, global_val, expected", [
+        (None, "any_value", False),
+        ("10", "10", False),
+        (10, 10, False),
+        ("0.2", "0.2", False),
+        ("15", "10", True),
+        ("0.3", "0.2", True),
+        (10, "10", False),
+        ("10", 10, False),
+        ("", "default", True),
+    ])
+    def test_is_custom(self, obj_val, global_val, expected):
+        assert _is_custom(obj_val, global_val) is expected
 
 
 # ═══════════════════════════════════════════════════════════════

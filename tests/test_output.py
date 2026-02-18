@@ -159,17 +159,21 @@ class TestFormatFileSize:
         """Missing key should return empty string."""
         assert _fmt_file_size({}) == ""
 
-    def test_kilobytes(self):
-        """Should format kilobytes correctly."""
-        assert _fmt_file_size({'file_size_bytes': 1024}) == "1.0 KB"
-        assert _fmt_file_size({'file_size_bytes': 2048}) == "2.0 KB"
-        assert _fmt_file_size({'file_size_bytes': 1536}) == "1.5 KB"
+    @pytest.mark.parametrize("bytes_val, expected", [
+        (1024, "1.0 KB"),
+        (2048, "2.0 KB"),
+        (1536, "1.5 KB"),
+    ])
+    def test_kilobytes(self, bytes_val, expected):
+        assert _fmt_file_size({'file_size_bytes': bytes_val}) == expected
 
-    def test_megabytes(self):
-        """Should format megabytes correctly."""
-        assert _fmt_file_size({'file_size_bytes': 1048576}) == "1.00 MB"
-        assert _fmt_file_size({'file_size_bytes': 10485760}) == "10.00 MB"
-        assert _fmt_file_size({'file_size_bytes': 1572864}) == "1.50 MB"
+    @pytest.mark.parametrize("bytes_val, expected", [
+        (1048576, "1.00 MB"),
+        (10485760, "10.00 MB"),
+        (1572864, "1.50 MB"),
+    ])
+    def test_megabytes(self, bytes_val, expected):
+        assert _fmt_file_size({'file_size_bytes': bytes_val}) == expected
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -253,25 +257,16 @@ class TestLoadCss3Colors:
 class TestFindNearestCss3Color:
     """Tests for nearest CSS3 color matching."""
 
-    def test_exact_red(self):
-        assert _find_nearest_css3_color(255, 0, 0) == 'Red'
-
-    def test_exact_blue(self):
-        assert _find_nearest_css3_color(0, 0, 255) == 'Blue'
-
-    def test_exact_yellow(self):
-        assert _find_nearest_css3_color(255, 255, 0) == 'Yellow'
-
-    def test_exact_black(self):
-        assert _find_nearest_css3_color(0, 0, 0) == 'Black'
-
-    def test_exact_white(self):
-        assert _find_nearest_css3_color(255, 255, 255) == 'White'
-
-    def test_gold_amber_matches_gold(self):
-        """#F0BE02 (240, 190, 2) should match 'Gold'."""
-        name = _find_nearest_css3_color(240, 190, 2)
-        assert name == 'Gold'
+    @pytest.mark.parametrize("r, g, b, expected", [
+        (255, 0, 0, 'Red'),
+        (0, 0, 255, 'Blue'),
+        (255, 255, 0, 'Yellow'),
+        (0, 0, 0, 'Black'),
+        (255, 255, 255, 'White'),
+        (240, 190, 2, 'Gold'),
+    ])
+    def test_exact_color_match(self, r, g, b, expected):
+        assert _find_nearest_css3_color(r, g, b) == expected
 
     def test_near_red_matches_red_family(self):
         """#DE1619 (222, 22, 25) should match a red-family color."""
@@ -293,40 +288,19 @@ class TestHexToColorName:
 
     # --- Exact CSS3 matches ---
 
-    def test_exact_red(self):
-        name, style = _hex_to_color_name('#FF0000FF')
-        assert name == 'Red'
-        assert style == '#FF0000'
-
-    def test_exact_blue(self):
-        name, style = _hex_to_color_name('#0000FFFF')
-        assert name == 'Blue'
-        assert style == '#0000FF'
-
-    def test_exact_yellow(self):
-        name, style = _hex_to_color_name('#FFFF00FF')
-        assert name == 'Yellow'
-        assert style == '#FFFF00'
-
-    def test_exact_black(self):
-        name, style = _hex_to_color_name('#000000FF')
-        assert name == 'Black'
-        assert style == '#000000'
-
-    def test_exact_white(self):
-        name, style = _hex_to_color_name('#FFFFFFFF')
-        assert name == 'White'
-        assert style == '#FFFFFF'
-
-    def test_exact_cyan(self):
-        name, style = _hex_to_color_name('#00FFFFFF')
-        assert name in ('Cyan', 'Aqua')
-        assert style == '#00FFFF'
-
-    def test_exact_magenta(self):
-        name, style = _hex_to_color_name('#FF00FFFF')
-        assert name in ('Magenta', 'Fuchsia')
-        assert style == '#FF00FF'
+    @pytest.mark.parametrize("hex_input, expected_name, expected_style", [
+        ('#FF0000FF', ('Red',), '#FF0000'),
+        ('#0000FFFF', ('Blue',), '#0000FF'),
+        ('#FFFF00FF', ('Yellow',), '#FFFF00'),
+        ('#000000FF', ('Black',), '#000000'),
+        ('#FFFFFFFF', ('White',), '#FFFFFF'),
+        ('#00FFFFFF', ('Cyan', 'Aqua'), '#00FFFF'),
+        ('#FF00FFFF', ('Magenta', 'Fuchsia'), '#FF00FF'),
+    ])
+    def test_exact_hex_color(self, hex_input, expected_name, expected_style):
+        name, style = _hex_to_color_name(hex_input)
+        assert name in expected_name
+        assert style == expected_style
 
     # --- Nearest-match (non-exact) ---
 
@@ -394,30 +368,17 @@ class TestHexToColorName:
 
     # --- Invalid inputs ---
 
-    def test_empty_string(self):
-        name, style = _hex_to_color_name('')
-        assert name == ''
-        assert style == 'white'
-
-    def test_no_hash_prefix(self):
-        name, style = _hex_to_color_name('FF0000')
-        assert name == 'FF0000'
-        assert style == 'white'
-
-    def test_short_hex(self):
-        name, style = _hex_to_color_name('#FFF')
-        assert name == '#FFF'
-        assert style == 'white'
-
-    def test_non_hex_chars(self):
-        name, style = _hex_to_color_name('#XYZXYZ')
-        assert name == '#XYZXYZ'
-        assert style == 'white'
-
-    def test_none_input(self):
-        name, style = _hex_to_color_name(None)
-        assert name is None
-        assert style == 'white'
+    @pytest.mark.parametrize("invalid_input, expected_name, expected_style", [
+        ('', '', 'white'),
+        ('FF0000', 'FF0000', 'white'),
+        ('#FFF', '#FFF', 'white'),
+        ('#XYZXYZ', '#XYZXYZ', 'white'),
+        (None, None, 'white'),
+    ])
+    def test_invalid_hex_input(self, invalid_input, expected_name, expected_style):
+        name, style = _hex_to_color_name(invalid_input)
+        assert name == expected_name
+        assert style == expected_style
 
     def test_every_color_gets_a_name(self):
         test_colors = [
@@ -439,49 +400,31 @@ class TestHexToColorName:
 class TestPrintResults:
     """Tests for print_results function."""
 
-    def test_print_results_basic(self, sample_3mf: Path):
+    @pytest.mark.parametrize("show_diff, no_color, wiki", [
+        (False, False, False),
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+    ])
+    def test_print_results_with_flags(self, sample_3mf: Path, show_diff, no_color, wiki):
         analyzer = ThreeMFAnalyzer(sample_3mf)
         result = analyzer.analyze()
-        print_results(result)
-
-    def test_print_results_diff_mode(self, sample_3mf: Path):
-        analyzer = ThreeMFAnalyzer(sample_3mf)
-        result = analyzer.analyze()
-        print_results(result, show_diff=True)
-
-    def test_print_results_no_color(self, sample_3mf: Path):
-        analyzer = ThreeMFAnalyzer(sample_3mf)
-        result = analyzer.analyze()
-        print_results(result, no_color=True)
-
-    def test_print_results_wiki_mode(self, sample_3mf: Path):
-        analyzer = ThreeMFAnalyzer(sample_3mf)
-        result = analyzer.analyze()
-        print_results(result, wiki=True)
+        print_results(result, show_diff=show_diff, no_color=no_color, wiki=wiki)
 
 
 class TestPrintGcodeResults:
     """Tests for print_gcode_results function."""
 
-    def test_print_gcode_results_basic(self, sample_gcode: Path):
+    @pytest.mark.parametrize("show_diff, no_color, wiki", [
+        (False, False, False),
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+    ])
+    def test_print_gcode_results_with_flags(self, sample_gcode: Path, show_diff, no_color, wiki):
         analyzer = GcodeAnalyzer(sample_gcode)
         result = analyzer.analyze()
-        print_gcode_results(result)
-
-    def test_print_gcode_results_diff_mode(self, sample_gcode: Path):
-        analyzer = GcodeAnalyzer(sample_gcode)
-        result = analyzer.analyze()
-        print_gcode_results(result, show_diff=True)
-
-    def test_print_gcode_results_no_color(self, sample_gcode: Path):
-        analyzer = GcodeAnalyzer(sample_gcode)
-        result = analyzer.analyze()
-        print_gcode_results(result, no_color=True)
-
-    def test_print_gcode_results_wiki_mode(self, sample_gcode: Path):
-        analyzer = GcodeAnalyzer(sample_gcode)
-        result = analyzer.analyze()
-        print_gcode_results(result, wiki=True)
+        print_gcode_results(result, show_diff=show_diff, no_color=no_color, wiki=wiki)
 
 
 # ═══════════════════════════════════════════════════════════════

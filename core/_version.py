@@ -5,4 +5,4 @@ Kept in a separate module so that setuptools can read it via
 heavy imports from __init__.py (rich, defusedxml, etc.).
 """
 
-__version__ = "2.4.0"
+__version__ = "2.4.1"

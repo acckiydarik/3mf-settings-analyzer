@@ -146,39 +146,18 @@ class TestSetupLogging:
 class TestGetFileType:
     """Tests for _get_file_type helper function."""
 
-    def test_3mf_extension(self, temp_dir: Path):
-        """Should detect .3mf files."""
-        path = temp_dir / "test.3mf"
+    @pytest.mark.parametrize("filename, expected", [
+        ("test.3mf", "3mf"),
+        ("test.3MF", "3mf"),
+        ("test.gcode", "gcode"),
+        ("test.GCODE", "gcode"),
+        ("test.txt", "unknown"),
+        ("test.stl", "unknown"),
+    ])
+    def test_detects_file_type(self, temp_dir: Path, filename, expected):
+        path = temp_dir / filename
         path.touch()
-        assert _get_file_type(path) == '3mf'
-
-    def test_3mf_uppercase(self, temp_dir: Path):
-        """Should detect .3MF files (case insensitive)."""
-        path = temp_dir / "test.3MF"
-        path.touch()
-        assert _get_file_type(path) == '3mf'
-
-    def test_gcode_extension(self, temp_dir: Path):
-        """Should detect .gcode files."""
-        path = temp_dir / "test.gcode"
-        path.touch()
-        assert _get_file_type(path) == 'gcode'
-
-    def test_gcode_uppercase(self, temp_dir: Path):
-        """Should detect .GCODE files (case insensitive)."""
-        path = temp_dir / "test.GCODE"
-        path.touch()
-        assert _get_file_type(path) == 'gcode'
-
-    def test_unknown_extension(self, temp_dir: Path):
-        """Should return 'unknown' for other extensions."""
-        path = temp_dir / "test.txt"
-        path.touch()
-        assert _get_file_type(path) == 'unknown'
-
-        path2 = temp_dir / "test.stl"
-        path2.touch()
-        assert _get_file_type(path2) == 'unknown'
+        assert _get_file_type(path) == expected
 
 
 # ═══════════════════════════════════════════════════════════════

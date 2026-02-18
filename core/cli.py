@@ -72,7 +72,7 @@ def _analyze_file(filepath: Path, file_type: str) -> Dict[str, Any]:
         zipfile.BadZipFile, json.JSONDecodeError, ParseError, ValueError, OSError
     """
     if file_type == '3mf':
-        analyzer = ThreeMFAnalyzer(str(filepath))
+        analyzer = ThreeMFAnalyzer(filepath)
         return analyzer.analyze()
     else:
         analyzer = GcodeAnalyzer(filepath)
