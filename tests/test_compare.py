@@ -544,6 +544,152 @@ class TestPrint3mfComparison:
         captured = capsys.readouterr()
         assert "STATISTICS" not in captured.out
 
+    def test_objects_transposed_shows_settings_as_rows(self, capsys):
+        """Object settings should appear as row labels (Plate, Filament, etc.)."""
+        results = [_make_3mf_result("a.3mf"), _make_3mf_result("b.3mf")]
+        print_3mf_comparison(results, no_color=True)
+        captured = capsys.readouterr()
+        for label in ("Plate", "Filament", "Layer Height", "Wall Loops",
+                       "Infill Density", "Support", "Brim Type", "Outer Wall Speed"):
+            assert label in captured.out
+
+    def test_objects_transposed_shows_object_name(self, capsys):
+        """Object header row should contain the object name."""
+        results = [_make_3mf_result("a.3mf"), _make_3mf_result("b.3mf")]
+        print_3mf_comparison(results, no_color=True)
+        captured = capsys.readouterr()
+        assert "TestObj" in captured.out
+        assert "#1" in captured.out
+
+    def test_objects_different_values_highlighted(self, capsys):
+        """Different per-object values should both appear in output."""
+        obj1 = [{"name": "Obj", "is_parent": True, "plate": "1",
+                 "filament": "1", "layer_height": "0.2", "layer_custom": False,
+                 "wall_loops": "3", "walls_custom": False,
+                 "infill": "15%", "infill_custom": False,
+                 "support": "Off", "support_custom": False,
+                 "brim": "No", "brim_custom": False,
+                 "outer_wall_speed": "200", "speed_custom": False,
+                 "custom_settings": {}, "is_part": False}]
+        obj2 = [{"name": "Obj", "is_parent": True, "plate": "1",
+                 "filament": "2", "layer_height": "0.2", "layer_custom": False,
+                 "wall_loops": "5", "walls_custom": False,
+                 "infill": "30%", "infill_custom": False,
+                 "support": "On", "support_custom": False,
+                 "brim": "Outer", "brim_custom": False,
+                 "outer_wall_speed": "300", "speed_custom": False,
+                 "custom_settings": {}, "is_part": False}]
+        r1 = _make_3mf_result("a.3mf", objects=obj1)
+        r2 = _make_3mf_result("b.3mf", objects=obj2)
+        print_3mf_comparison([r1, r2], no_color=True)
+        captured = capsys.readouterr()
+        assert "200" in captured.out
+        assert "300" in captured.out
+        assert "15%" in captured.out
+        assert "30%" in captured.out
+
+    def test_objects_custom_settings_shown(self, capsys):
+        """Per-object custom settings should appear with * prefix."""
+        obj = [{"name": "Obj", "is_parent": True, "plate": "1",
+                "filament": "1", "layer_height": "0.2", "layer_custom": False,
+                "wall_loops": "3", "walls_custom": False,
+                "infill": "80%", "infill_custom": True,
+                "support": "Off", "support_custom": False,
+                "brim": "No", "brim_custom": False,
+                "outer_wall_speed": "200", "speed_custom": False,
+                "custom_settings": {"sparse_infill_density": "80%"},
+                "is_part": False}]
+        results = [_make_3mf_result("a.3mf", objects=obj),
+                   _make_3mf_result("b.3mf", objects=obj)]
+        print_3mf_comparison(results, no_color=True)
+        captured = capsys.readouterr()
+        assert "* sparse_infill_density" in captured.out
+        assert "80%" in captured.out
+
+    def test_objects_missing_object_shows_placeholder(self, capsys):
+        """When file B has fewer objects, missing values show --."""
+        obj_a = [
+            {"name": "Obj1", "is_parent": True, "plate": "1",
+             "filament": "1", "layer_height": "0.2", "layer_custom": False,
+             "wall_loops": "3", "walls_custom": False,
+             "infill": "15%", "infill_custom": False,
+             "support": "Off", "support_custom": False,
+             "brim": "No", "brim_custom": False,
+             "outer_wall_speed": "200", "speed_custom": False,
+             "custom_settings": {}, "is_part": False},
+            {"name": "Obj2", "is_parent": True, "plate": "1",
+             "filament": "2", "layer_height": "0.2", "layer_custom": False,
+             "wall_loops": "3", "walls_custom": False,
+             "infill": "15%", "infill_custom": False,
+             "support": "Off", "support_custom": False,
+             "brim": "No", "brim_custom": False,
+             "outer_wall_speed": "200", "speed_custom": False,
+             "custom_settings": {}, "is_part": False},
+        ]
+        obj_b = [obj_a[0]]  # Only first object
+        r1 = _make_3mf_result("a.3mf", objects=obj_a)
+        r2 = _make_3mf_result("b.3mf", objects=obj_b)
+        print_3mf_comparison([r1, r2], no_color=True)
+        captured = capsys.readouterr()
+        assert "#1" in captured.out
+        assert "#2" in captured.out
+        assert "--" in captured.out
+
+    def test_objects_children_rendered(self, capsys):
+        """Child (part) objects should be rendered under parent."""
+        objs = [
+            {"name": "ParentObj", "is_parent": True, "plate": "1",
+             "filament": "1", "layer_height": "0.2", "layer_custom": False,
+             "wall_loops": "3", "walls_custom": False,
+             "infill": "15%", "infill_custom": False,
+             "support": "Off", "support_custom": False,
+             "brim": "No", "brim_custom": False,
+             "outer_wall_speed": "200", "speed_custom": False,
+             "custom_settings": {}, "is_part": False},
+            {"name": "  ChildPart", "is_parent": False, "plate": "",
+             "filament": "1", "layer_height": "", "layer_custom": False,
+             "wall_loops": "3", "walls_custom": False,
+             "infill": "15%", "infill_custom": False,
+             "support": "Off", "support_custom": False,
+             "brim": "", "brim_custom": False,
+             "outer_wall_speed": "200", "speed_custom": False,
+             "custom_settings": {}, "is_part": True},
+        ]
+        results = [_make_3mf_result("a.3mf", objects=objs),
+                   _make_3mf_result("b.3mf", objects=objs)]
+        print_3mf_comparison(results, no_color=True)
+        captured = capsys.readouterr()
+        assert "ParentObj" in captured.out
+        assert "ChildPart" in captured.out
+
+    def test_objects_custom_settings_union_with_placeholder(self, capsys):
+        """Custom settings should be union; missing keys get --."""
+        obj1 = [{"name": "Obj", "is_parent": True, "plate": "1",
+                 "filament": "1", "layer_height": "0.2", "layer_custom": False,
+                 "wall_loops": "3", "walls_custom": False,
+                 "infill": "15%", "infill_custom": False,
+                 "support": "Off", "support_custom": False,
+                 "brim": "No", "brim_custom": False,
+                 "outer_wall_speed": "200", "speed_custom": False,
+                 "custom_settings": {"sparse_infill_density": "80%"},
+                 "is_part": False}]
+        obj2 = [{"name": "Obj", "is_parent": True, "plate": "1",
+                 "filament": "1", "layer_height": "0.2", "layer_custom": False,
+                 "wall_loops": "5", "walls_custom": True,
+                 "infill": "15%", "infill_custom": False,
+                 "support": "Off", "support_custom": False,
+                 "brim": "No", "brim_custom": False,
+                 "outer_wall_speed": "200", "speed_custom": False,
+                 "custom_settings": {"wall_loops": "5"},
+                 "is_part": False}]
+        r1 = _make_3mf_result("a.3mf", objects=obj1)
+        r2 = _make_3mf_result("b.3mf", objects=obj2)
+        print_3mf_comparison([r1, r2], no_color=True)
+        captured = capsys.readouterr()
+        assert "* sparse_infill_density" in captured.out
+        assert "* wall_loops" in captured.out
+        assert "--" in captured.out
+
 
 # ═══════════════════════════════════════════════════════════════
 # Test CLI integration for comparison mode

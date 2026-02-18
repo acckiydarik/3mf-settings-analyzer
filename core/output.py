@@ -228,7 +228,7 @@ def _format_support_value(support: str, is_custom: bool) -> str:
     else:
         if is_custom:
             return "[bold yellow]*Off[/bold yellow]"
-        return "[dim]Off[/dim]"
+        return "Off"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -237,8 +237,8 @@ def _format_support_value(support: str, is_custom: bool) -> str:
 
 def _print_header(console: Console, filename: str):
     table = Table(
-        show_header=False, box=box.SIMPLE, show_edge=False,
-        padding=(0, 2), expand=True, border_style="dim bright_yellow",
+        show_header=False, box=None,
+        padding=(0, 2), expand=True,
     )
     table.add_column("", width=SINGLE_LABEL_WIDTH)
     table.add_column(ratio=1)
@@ -566,7 +566,8 @@ def _print_objects_table(console: Console, rows: List[Dict], profile: Dict[str, 
 
     console.rule("[bold bright_yellow]OBJECTS[/bold bright_yellow]", style="grey50")
 
-    table = Table(box=box.ROUNDED, show_lines=False, header_style="bold blue", expand=True, border_style="grey50")
+    table = Table(box=box.ROUNDED, show_lines=False, header_style="bold blue", expand=True, border_style="grey50",
+                  row_styles=["", "on rgb(25,25,30)"])
     table.add_column("Plate", justify="center", style="white", width=5)
     table.add_column("Name", style="white", min_width=20, max_width=50)
     table.add_column("Filament", justify="center", width=8)

@@ -34,7 +34,7 @@ LABEL_WIDTH = 34
 def _make_table(n_files: int, label_style: str = "dim") -> Table:
     """Create a comparison table with label column + N value columns."""
     table = Table(show_header=False, box=None, padding=(0, 2), expand=True)
-    table.add_column("Setting", style=label_style, width=LABEL_WIDTH, no_wrap=True)
+    table.add_column("Setting", style=label_style, width=LABEL_WIDTH, no_wrap=True, overflow="ellipsis")
     for _ in range(n_files):
         table.add_column(ratio=1)
     return table
@@ -100,8 +100,8 @@ def _print_compare_header(
     """Print the comparison title panel with file names aligned to columns."""
     title = "GCODE" if is_gcode else "3MF"
     table = Table(
-        show_header=False, box=box.SIMPLE, show_edge=False,
-        padding=(0, 2), expand=True, border_style="dim bright_yellow",
+        show_header=False, box=None,
+        padding=(0, 2), expand=True,
     )
     table.add_column("", width=LABEL_WIDTH)
     for _ in filenames:
@@ -419,24 +419,265 @@ def _print_compare_objects_gcode(
     _print_objects_compare_table(console, objects_per_file, filenames)
 
 
+def _resolve_object_name(
+    parents_per_file: List[List[Dict]], obj_idx: int,
+) -> str:
+    """Pick the first non-empty object name across files for a given index."""
+    for plist in parents_per_file:
+        if obj_idx < len(plist):
+            return plist[obj_idx].get('name', f'Object {obj_idx + 1}').strip()
+    return f"Object {obj_idx + 1}"
+
+
+def _resolve_child_name(
+    children_per_file: List[List[Dict]], child_idx: int,
+) -> str:
+    """Pick the first non-empty child name across files for a given index."""
+    for ch in children_per_file:
+        if child_idx < len(ch):
+            return ch[child_idx].get('name', 'Part').strip()
+    return "Part"
+
+
+def _collect_children(
+    all_rows: List[List[Dict]],
+    parents_per_file: List[List[Dict]],
+    obj_idx: int,
+) -> List[List[Dict]]:
+    """Collect child (part) rows that follow a given parent object in each file."""
+    children_per_file: List[List[Dict]] = []
+    for file_idx, rows in enumerate(all_rows):
+        plist = parents_per_file[file_idx]
+        if obj_idx >= len(plist):
+            children_per_file.append([])
+            continue
+
+        parent_pos = rows.index(plist[obj_idx])
+        children: List[Dict] = []
+        for row in rows[parent_pos + 1:]:
+            if row.get('is_parent'):
+                break
+            children.append(row)
+        children_per_file.append(children)
+    return children_per_file
+
+
+def _add_object_setting_rows(
+    table: Table,
+    obj_rows: List[Any],
+    n: int,
+    settings: List[Tuple[str, str]],
+    indent: str = "  ",
+) -> None:
+    """Add standard setting rows for one object across files."""
+    for label, key in settings:
+        values = []
+        for row in obj_rows:
+            if row is None:
+                values.append("")
+            else:
+                val = row.get(key, "")
+                values.append(str(val) if val else "")
+        _add_row(table, f"[bold blue]{indent}{label}[/bold blue]", values, placeholder="[dim]--[/dim]")
+
+
+def _add_object_custom_rows(
+    table: Table,
+    obj_rows: List[Any],
+    n: int,
+    indent: str = "  ",
+) -> None:
+    """Add custom per-object settings as union rows with diff highlighting."""
+    customs = [
+        (row.get('custom_settings', {}) if row else {})
+        for row in obj_rows
+    ]
+    all_keys: List[str] = []
+    seen: set = set()
+    for c in customs:
+        for k in c:
+            if k not in seen:
+                all_keys.append(k)
+                seen.add(k)
+
+    for key in all_keys:
+        values = []
+        for c in customs:
+            val = c.get(key)
+            values.append(escape(str(val)) if val is not None else "")
+        _add_row(
+            table,
+            f"[yellow]{indent}└─ * {key}[/yellow]",
+            values,
+            placeholder="[dim]--[/dim]",
+        )
+
+
+def _add_obj_bordered_rows(
+    table: Table,
+    obj_rows: List[Any],
+    n: int,
+    settings: List[Tuple[str, str]],
+    indent: str = "  ",
+) -> None:
+    """Add standard setting rows to a bordered objects table with diff highlighting."""
+    for label, key in settings:
+        values = []
+        for row in obj_rows:
+            if row is None:
+                values.append("")
+            else:
+                val = row.get(key, "")
+                values.append(str(val) if val else "")
+
+        non_empty = [v for v in values if v]
+        differs = (
+            len(non_empty) > 0
+            and (len(set(non_empty)) > 1 or len(non_empty) < len(values))
+        )
+
+        cells = []
+        for v in values:
+            if v:
+                t = Text(v)
+                if differs:
+                    t.stylize(DIFF_BG)
+            else:
+                t = Text.from_markup("[dim]--[/dim]")
+                if differs:
+                    t.stylize(DIFF_BG)
+            cells.append(t)
+        table.add_row(f"[bold blue]{indent}{label}[/bold blue]", *cells)
+
+
+def _add_obj_bordered_custom(
+    table: Table,
+    obj_rows: List[Any],
+    n: int,
+    indent: str = "  ",
+) -> None:
+    """Add custom per-object settings to a bordered objects table with diff highlighting."""
+    customs = [
+        (row.get('custom_settings', {}) if row else {})
+        for row in obj_rows
+    ]
+    all_keys: List[str] = []
+    seen: set = set()
+    for c in customs:
+        for k in c:
+            if k not in seen:
+                all_keys.append(k)
+                seen.add(k)
+
+    for key in all_keys:
+        values = []
+        for c in customs:
+            val = c.get(key)
+            values.append(str(val) if val is not None else "")
+
+        non_empty = [v for v in values if v]
+        differs = (
+            len(non_empty) > 0
+            and (len(set(non_empty)) > 1 or len(non_empty) < len(values))
+        )
+
+        cells = []
+        for v in values:
+            if v:
+                t = Text(v)
+                if differs:
+                    t.stylize(DIFF_BG)
+            else:
+                t = Text.from_markup("[dim]--[/dim]")
+                if differs:
+                    t.stylize(DIFF_BG)
+            cells.append(t)
+        table.add_row(f"[yellow]{indent}\u2514\u2500 * {key}[/yellow]", *cells)
+
+
 def _print_compare_objects_3mf(
     console: Console, results: List[Dict], n: int,
 ) -> None:
-    """Print Objects section for 3MF comparison (per-file object lists in table)."""
-    names_per_file = []
-    for r in results:
-        names = [row['name'] for row in r.get('rows', []) if row.get('is_parent')]
-        names_per_file.append(names)
+    """Print Objects section for 3MF comparison (transposed with bordered table)."""
+    all_rows = [r.get('rows', []) for r in results]
 
-    max_count = max((len(names) for names in names_per_file), default=0)
+    parents_per_file = [
+        [row for row in rows if row.get('is_parent')]
+        for rows in all_rows
+    ]
+    max_parents = max((len(p) for p in parents_per_file), default=0)
 
-    if max_count == 0:
+    if max_parents == 0:
         console.print("\n[red]No objects found[/red]")
         return
 
     console.rule("[bold bright_yellow]OBJECTS[/bold bright_yellow]", style="grey50")
+
     filenames = [r['file'] for r in results]
-    _print_objects_compare_table(console, names_per_file, filenames)
+    table = Table(
+        box=box.ROUNDED, show_lines=False, header_style="bold blue",
+        expand=True, border_style="grey50",
+        row_styles=["", "on rgb(25,25,30)"],
+    )
+    table.add_column("Setting", width=LABEL_WIDTH, no_wrap=True)
+    for _ in filenames:
+        table.add_column("Value", ratio=1)
+
+    _OBJ_SETTINGS = [
+        ("Plate", "plate"),
+        ("Filament", "filament"),
+        ("Layer Height", "layer_height"),
+        ("Wall Loops", "wall_loops"),
+        ("Infill Density", "infill"),
+        ("Support", "support"),
+        ("Brim Type", "brim"),
+        ("Outer Wall Speed", "outer_wall_speed"),
+    ]
+
+    _CHILD_SETTINGS = [
+        ("Filament", "filament"),
+        ("Wall Loops", "wall_loops"),
+        ("Infill Density", "infill"),
+        ("Support", "support"),
+        ("Outer Wall Speed", "outer_wall_speed"),
+    ]
+
+    for obj_idx in range(max_parents):
+        if obj_idx > 0:
+            table.add_section()
+
+        obj_name = _resolve_object_name(parents_per_file, obj_idx)
+        table.add_row(
+            f"[bold white]#{obj_idx + 1}  {escape(obj_name)}[/bold white]",
+            *[""] * n,
+        )
+
+        parent_rows = [
+            plist[obj_idx] if obj_idx < len(plist) else None
+            for plist in parents_per_file
+        ]
+
+        _add_obj_bordered_rows(table, parent_rows, n, _OBJ_SETTINGS)
+        _add_obj_bordered_custom(table, parent_rows, n)
+
+        children_per_file = _collect_children(all_rows, parents_per_file, obj_idx)
+        max_children = max((len(ch) for ch in children_per_file), default=0)
+
+        for child_idx in range(max_children):
+            child_name = _resolve_child_name(children_per_file, child_idx)
+            table.add_row(
+                f"  [dim]{escape(child_name)}[/dim]",
+                *[""] * n,
+            )
+            child_rows = [
+                ch[child_idx] if child_idx < len(ch) else None
+                for ch in children_per_file
+            ]
+            _add_obj_bordered_rows(table, child_rows, n, _CHILD_SETTINGS, indent="    ")
+            _add_obj_bordered_custom(table, child_rows, n, indent="    ")
+
+    console.print(table)
+    console.print("[bold yellow]*[/bold yellow] = custom value (overrides profile default)")
 
 
 def _print_objects_compare_table(

@@ -35,6 +35,9 @@ A command-line tool that extracts and displays print settings from **3MF** and *
 - **Diff highlighting** -- values that differ between files are highlighted with a muted background
 - **Per-file columns** -- consistent column alignment across all sections (Profile, Global Settings, Custom Global, Objects, Statistics)
 - **Missing value indicators** -- empty fields are shown as `--` with diff highlighting when other files have a value
+- **Custom value footnote** -- 3MF comparison includes the `* = custom value` indicator for per-object overrides
+- **Transposed objects layout** -- 3MF objects in comparison mode display each setting as a row with per-file value columns, including child objects and custom overrides
+- **Zebra striping** -- objects tables use alternating row backgrounds for easier visual tracking across columns
 
 ### Common features
 
@@ -176,16 +179,16 @@ python3 analyze.py --update-wiki
 │   * seam_position            back                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ─────────────────────────────────── OBJECTS ────────────────────────────────────
-╭───────┬──────────────────────────┬──────────┬───────┬───────┬────────┬─────────╮
-│ Plate │ Name                     │ Filament │ Layer │ Walls │ Infill │ Support │
-├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┤
-│   1   │ MyObject                 │    1     │  0.2  │   3   │   15   │   Off   │
-│   1   │ Assembly                 │    1     │  0.2  │   3   │  *80   │   *On   │
-│       │     ├─ enable_support: 1 │          │       │       │        │         │
-│       │     └─ sparse_infill: 80 │          │       │       │        │         │
-│       │   part_a                 │    1     │       │   3   │   80   │   On    │
-│       │   part_b                 │    2     │       │   3   │   80   │   On    │
-╰───────┴──────────────────────────┴──────────┴───────┴───────┴────────┴─────────╯
+╭───────┬──────────────────────────┬──────────┬───────┬───────┬────────┬─────────┬──────┬───────╮
+│ Plate │ Name                     │ Filament │ Layer │ Walls │ Infill │ Support │ Brim │ Speed │
+├───────┼──────────────────────────┼──────────┼───────┼───────┼────────┼─────────┼──────┼───────┤
+│   1   │ MyObject                 │    1     │  0.2  │   3   │   15   │   Off   │ Outer│  200  │
+│   1   │ Assembly                 │    1     │  0.2  │   3   │  *80   │   *On   │ Outer│  200  │
+│       │     ├─ enable_support: 1 │          │       │       │        │         │      │       │
+│       │     └─ sparse_infill: 80 │          │       │       │        │         │      │       │
+│       │   part_a                 │    1     │       │   3   │   80   │   On    │      │  200  │
+│       │   part_b                 │    2     │       │   3   │   80   │   On    │      │  200  │
+╰───────┴──────────────────────────┴──────────┴───────┴───────┴────────┴─────────┴──────┴───────╯
 * = custom value (overrides profile default)
 ```
 
@@ -306,6 +309,28 @@ When 2-4 files of the same type are passed, the tool automatically switches to c
 ```
 
 Values that differ between files are highlighted with a muted background. Empty fields are shown as `--`.
+
+For 3MF files, the Objects section uses a transposed layout where each object's settings are displayed as rows with per-file value columns:
+
+```text
+─────────────────────────────────── OBJECTS ────────────────────────────────────
+╭──────────────────────────────────┬──────────────────────┬──────────────────────╮
+│ Setting                          │ Value                │ Value                │
+├──────────────────────────────────┼──────────────────────┼──────────────────────┤
+│ #1  MyObject.stp                 │                      │                      │
+│   Plate                          │ 1                    │ 1                    │
+│   Filament                       │ 1                    │ 2                    │
+│   Infill Density                 │ 15                   │ 80                   │
+│   Support                        │ Off                  │ On                   │
+│   └─ * sparse_infill_density     │ --                   │ 80%                  │
+├──────────────────────────────────┼──────────────────────┼──────────────────────┤
+│ #2  AnotherObject.stp            │                      │                      │
+│   ...                            │                      │                      │
+╰──────────────────────────────────┴──────────────────────┴──────────────────────╯
+* = custom value (overrides profile default)
+```
+
+Objects tables in both single-file and comparison modes use alternating row backgrounds (zebra striping) for easier row tracking across columns.
 
 ## How It Works
 

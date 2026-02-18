@@ -129,10 +129,9 @@ class TestFormatSupportValue:
         assert 'bold yellow' in result
 
     def test_support_off_not_custom(self):
-        """Support Off (not custom) should be dim."""
+        """Support Off (not custom) should be plain text without markup."""
         result = _format_support_value('Off', False)
-        assert 'Off' in result
-        assert 'dim' in result
+        assert result == 'Off'
         assert '*' not in result
 
     def test_support_off_custom(self):
