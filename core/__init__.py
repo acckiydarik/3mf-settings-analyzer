@@ -5,11 +5,12 @@ Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the s
 3MF/Gcode metadata format.
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 from core.threemf import ThreeMFAnalyzer
 from core.gcode import GcodeAnalyzer
 from core.output import print_results, print_gcode_results
+from core.compare import print_gcode_comparison, print_3mf_comparison
 from core.cli import main, setup_logging
 
 __all__ = [
@@ -18,6 +19,8 @@ __all__ = [
     "GcodeAnalyzer",
     "print_results",
     "print_gcode_results",
+    "print_gcode_comparison",
+    "print_3mf_comparison",
     "main",
     "setup_logging",
 ]

@@ -6,6 +6,7 @@ import logging
 import sys
 import zipfile
 from pathlib import Path
+from typing import Any, Dict, List
 from xml.etree.ElementTree import ParseError
 
 from rich.console import Console
@@ -17,6 +18,8 @@ from core.output import print_gcode_results, print_results
 from core.threemf import ThreeMFAnalyzer
 
 logger = logging.getLogger(__name__)
+
+MAX_COMPARE_FILES = 4
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -42,6 +45,122 @@ def _get_file_type(filepath: Path) -> str:
     return 'unknown'
 
 
+def _preload_wiki(args) -> None:
+    """Pre-load wiki data before output so download messages don't interrupt tables."""
+    if not args.wiki or args.json:
+        return
+    try:
+        from settings_wiki import _load_cache, _JSON_PATH
+        if not _JSON_PATH.exists():
+            console = Console(no_color=args.no_color)
+            console.print("[cyan]Downloading wiki data from OrcaSlicer GitHub...[/cyan]")
+            _load_cache()
+            if _JSON_PATH.exists():
+                console.print("[green]Wiki data downloaded successfully.[/green]")
+            else:
+                console.print("[yellow]Wiki data unavailable. Wiki links will be disabled.[/yellow]")
+        else:
+            _load_cache()
+    except Exception as e:
+        logger.debug("Wiki pre-load failed: %s", e)
+
+
+def _analyze_file(filepath: Path, file_type: str) -> Dict[str, Any]:
+    """Parse a single file and return the result dict.
+
+    Raises:
+        zipfile.BadZipFile, json.JSONDecodeError, ParseError, ValueError, OSError
+    """
+    if file_type == '3mf':
+        analyzer = ThreeMFAnalyzer(str(filepath))
+        return analyzer.analyze()
+    else:
+        analyzer = GcodeAnalyzer(filepath)
+        return analyzer.analyze()
+
+
+def _parse_multiple_files(filepaths: List[Path], file_type: str) -> List[Dict[str, Any]]:
+    """Parse multiple files, logging errors for failures.
+
+    Returns list of successfully parsed results. Failed files are skipped
+    with a logged error.
+    """
+    results: List[Dict[str, Any]] = []
+    for fp in filepaths:
+        try:
+            results.append(_analyze_file(fp, file_type))
+        except zipfile.BadZipFile:
+            logger.error("Invalid or corrupted ZIP/3MF file (skipped): %s", fp)
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse project settings in %s (skipped): %s", fp, e)
+        except ParseError as e:
+            logger.error("Failed to parse model settings in %s (skipped): %s", fp, e)
+        except ValueError as e:
+            logger.error("Validation error in %s (skipped): %s", fp, e)
+        except OSError as e:
+            logger.error("File system error for %s (skipped): %s", fp, e)
+    return results
+
+
+def _run_single(filepath: Path, file_type: str, args) -> None:
+    """Run single-file analysis (existing behavior)."""
+    try:
+        result = _analyze_file(filepath, file_type)
+
+        if args.json:
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        elif file_type == '3mf':
+            print_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
+        else:
+            print_gcode_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
+
+    except zipfile.BadZipFile:
+        logger.error("Invalid or corrupted ZIP/3MF file: %s", filepath)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse project settings (invalid JSON): %s", e)
+        sys.exit(1)
+    except ParseError as e:
+        logger.error("Failed to parse model settings (invalid XML): %s", e)
+        sys.exit(1)
+    except ValueError as e:
+        logger.error("Security or validation error: %s", e)
+        sys.exit(1)
+    except OSError as e:
+        logger.error("File system error: %s", e)
+        sys.exit(1)
+
+
+def _run_comparison(filepaths: List[Path], file_type: str, args) -> None:
+    """Run multi-file comparison mode."""
+    from core.compare import print_3mf_comparison, print_gcode_comparison
+
+    results = _parse_multiple_files(filepaths, file_type)
+
+    if not results:
+        logger.error("No files were parsed successfully")
+        sys.exit(1)
+
+    if len(results) == 1:
+        logger.warning("Only one file parsed successfully, falling back to single-file mode")
+        if args.json:
+            print(json.dumps(results[0], indent=2, ensure_ascii=False))
+        elif file_type == '3mf':
+            print_results(results[0], show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
+        else:
+            print_gcode_results(results[0], show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
+        return
+
+    if args.json:
+        print(json.dumps(results, indent=2, ensure_ascii=False))
+        return
+
+    if file_type == '3mf':
+        print_3mf_comparison(results, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
+    else:
+        print_gcode_comparison(results, no_color=args.no_color, wiki=args.wiki)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='3MF Settings Analyzer - Analyze 3MF and Gcode files and display slicer settings',
@@ -55,10 +174,12 @@ Examples:
   python analyze.py model.3mf --verbose
   python analyze.py model.3mf --wiki
   python analyze.py model.3mf --no-color > output.txt
+  python analyze.py file1.gcode file2.gcode
+  python analyze.py a.gcode b.gcode c.gcode d.gcode
   python analyze.py --update-wiki
 """
     )
-    parser.add_argument('file', nargs='?', help='Path to 3MF or Gcode file')
+    parser.add_argument('files', nargs='*', help='Path to 3MF or Gcode file(s). Pass 2-4 files for comparison mode.')
     parser.add_argument('--diff', action='store_true',
                         help='Show comparison with global settings')
     parser.add_argument('--json', action='store_true',
@@ -94,79 +215,48 @@ Examples:
         except Exception as e:
             logger.error("Failed to update wiki data: %s", e)
             console.print(f"[red]Failed to update wiki data: {e}[/red]")
-            if not args.file:
+            if not args.files:
                 sys.exit(1)
-        if not args.file:
+        if not args.files:
             sys.exit(0)
 
-    filepath = Path(args.file) if args.file else None
+    if not args.files:
+        parser.error("the following arguments are required: files")
 
-    if filepath is None:
-        parser.error("the following arguments are required: file")
-
-    if not filepath.exists():
-        logger.error("File not found: %s", filepath)
+    if len(args.files) > MAX_COMPARE_FILES:
+        logger.error("Maximum %d files for comparison (got %d)", MAX_COMPARE_FILES, len(args.files))
         sys.exit(1)
 
-    file_type = _get_file_type(filepath)
+    # Validate all files exist and detect types
+    filepaths: List[Path] = []
+    file_types: List[str] = []
+    for raw_path in args.files:
+        fp = Path(raw_path)
+        if not fp.exists():
+            logger.error("File not found: %s", fp)
+            sys.exit(1)
+        ft = _get_file_type(fp)
+        if ft == 'unknown':
+            logger.error("Unsupported file type: %s (use .3mf or .gcode)", fp.suffix)
+            sys.exit(1)
+        filepaths.append(fp)
+        file_types.append(ft)
 
-    if file_type == 'unknown':
-        logger.error("Unsupported file type: %s (use .3mf or .gcode)", filepath.suffix)
+    # Validate all files are the same type
+    unique_types = set(file_types)
+    if len(unique_types) > 1:
+        logger.error("Cannot compare .gcode with .3mf files. All files must be the same type.")
         sys.exit(1)
 
-    # Pre-load wiki data before output so download messages don't interrupt tables
-    if args.wiki and not args.json:
-        try:
-            from settings_wiki import _load_cache, _JSON_PATH
-            if not _JSON_PATH.exists():
-                console = Console(no_color=args.no_color)
-                console.print("[cyan]Downloading wiki data from OrcaSlicer GitHub...[/cyan]")
-                _load_cache()
-                if _JSON_PATH.exists():
-                    console.print("[green]Wiki data downloaded successfully.[/green]")
-                else:
-                    console.print("[yellow]Wiki data unavailable. Wiki links will be disabled.[/yellow]")
-            else:
-                _load_cache()
-        except Exception as e:
-            logger.debug("Wiki pre-load failed: %s", e)
+    file_type = file_types[0]
+
+    _preload_wiki(args)
 
     try:
-        if file_type == '3mf':
-            analyzer = ThreeMFAnalyzer(str(filepath))
-            result = analyzer.analyze()
-
-            if args.json:
-                print(json.dumps(result, indent=2, ensure_ascii=False))
-            else:
-                print_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
-
-        elif file_type == 'gcode':
-            analyzer = GcodeAnalyzer(filepath)
-            result = analyzer.analyze()
-
-            if args.json:
-                print(json.dumps(result, indent=2, ensure_ascii=False))
-            else:
-                print_gcode_results(result, show_diff=args.diff, no_color=args.no_color, wiki=args.wiki)
-
-    except zipfile.BadZipFile:
-        logger.error("Invalid or corrupted ZIP/3MF file: %s", filepath)
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        logger.error("Failed to parse project settings (invalid JSON): %s", e)
-        sys.exit(1)
-    except ParseError as e:
-        logger.error("Failed to parse model settings (invalid XML): %s", e)
-        sys.exit(1)
-    except ValueError as e:
-        # Security-related errors (e.g., Zip Slip attack detection)
-        logger.error("Security or validation error: %s", e)
-        sys.exit(1)
-    except OSError as e:
-        # File system errors (permissions, disk full, etc.)
-        logger.error("File system error: %s", e)
-        sys.exit(1)
+        if len(filepaths) == 1:
+            _run_single(filepaths[0], file_type, args)
+        else:
+            _run_comparison(filepaths, file_type, args)
     except KeyboardInterrupt:
         logger.info("Operation cancelled by user")
         sys.exit(130)

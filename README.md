@@ -28,6 +28,14 @@ A command-line tool that extracts and displays print settings from **3MF** and *
   - Temperature settings (nozzle and bed, including first layer)
   - Multi-material info (filament changes, prime tower status)
 
+### Comparison mode
+
+- **Side-by-side comparison** -- compare 2 to 4 files of the same type in a column-based layout
+- **Auto-detection** -- comparison mode triggers automatically when multiple files are passed (no extra flags needed)
+- **Diff highlighting** -- values that differ between files are highlighted with a muted background
+- **Per-file columns** -- consistent column alignment across all sections (Profile, Global Settings, Custom Global, Objects, Statistics)
+- **Missing value indicators** -- empty fields are shown as `--` with diff highlighting when other files have a value
+
 ### Common features
 
 - **JSON export** -- raw structured data output for scripting and automation
@@ -68,7 +76,7 @@ python3 analyze.py model.gcode
 ## Usage
 
 ```bash
-python3 analyze.py <file> [options]
+python3 analyze.py <file> [file2 ...] [options]
 ```
 
 ### Options
@@ -123,6 +131,18 @@ Save plain-text output to a file:
 python3 analyze.py model.3mf --no-color > report.txt
 ```
 
+Compare two Gcode files side by side:
+
+```bash
+python3 analyze.py file1.gcode file2.gcode
+```
+
+Compare up to four files (same type):
+
+```bash
+python3 analyze.py a.3mf b.3mf c.3mf d.3mf
+```
+
 Update wiki data from OrcaSlicer GitHub:
 
 ```bash
@@ -135,7 +155,7 @@ python3 analyze.py --update-wiki
 
 ```text
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ 3MF SETTINGS ANALYZER  |  example.3mf                                        │
+│   3MF SETTINGS ANALYZER:                  example.3mf                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ─────────────────────────────────── PROFILE ────────────────────────────────────
 ╭──────────────────────────────────────────────────────────────────────────────╮
@@ -173,7 +193,7 @@ python3 analyze.py --update-wiki
 
 ```text
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ GCODE SETTINGS ANALYZER  |  model.gcode                                      │
+│   GCODE SETTINGS ANALYZER:                model.gcode                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ─────────────────────────────────── PROFILE ────────────────────────────────────
 ╭──────────────────────────────────────────────────────────────────────────────╮
@@ -263,6 +283,30 @@ With `--diff`, custom values show the original default alongside:
 │  *80 <-15%  │  *On <-Off  │
 ```
 
+### Comparison output
+
+When 2-4 files of the same type are passed, the tool automatically switches to comparison mode with a column-based layout:
+
+```text
+╭──────────────────────────────────────────────────────────────────────────────╮
+│   GCODE SETTINGS COMPARISON:      file_a.gcode         file_b.gcode         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+──────────────────────────────────── PROFILE ───────────────────────────────────
+╭──────────────────────────────────────────────────────────────────────────────╮
+│   Printer                          Bambu Lab A1M         Bambu Lab A1M      │
+│   Process                          0.20mm Standard       0.16mm Quality     │
+│   Filament 1                       Bambu PLA Basic       Bambu PLA Basic    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+─────────────────────────────── GLOBAL SETTINGS ───────────────────────────────
+╭──────────────────────────────────────────────────────────────────────────────╮
+│   Layer Height                     0.2 mm                0.16 mm            │
+│   Wall Loops                       3                     2                  │
+│   ...                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+Values that differ between files are highlighted with a muted background. Empty fields are shown as `--`.
+
 ## How It Works
 
 ### 3MF files
@@ -317,7 +361,8 @@ The analyzer parses:
 │   ├── threemf.py              # ThreeMFAnalyzer class + _is_custom helper
 │   ├── gcode.py                # GcodeAnalyzer class
 │   ├── output.py               # Rich formatting: panels, tables, colors, helpers
-│   └── cli.py                  # argparse, main(), setup_logging(), _get_file_type()
+│   ├── compare.py              # Side-by-side comparison for 2-4 files with diff highlighting
+│   └── cli.py                  # argparse, main(), multi-file routing, setup_logging()
 ├── settings_wiki.py        # OrcaSlicer settings reference module
 ├── tests/                  # Unit tests
 │   ├── conftest.py             # Pytest fixtures (3MF + Gcode)
@@ -326,6 +371,7 @@ The analyzer parses:
 │   ├── test_gcode.py           # Tests for core.gcode
 │   ├── test_output.py          # Tests for core.output
 │   ├── test_cli.py             # Tests for core.cli
+│   ├── test_compare.py         # Tests for core.compare (comparison mode)
 │   └── test_settings_wiki.py   # Tests for settings_wiki
 ├── data/
 │   ├── css3_colors.json        # W3C CSS3 named colors for color recognition

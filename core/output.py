@@ -15,6 +15,8 @@ from core.constants import BOOL_TRUE, FILAMENT_COLORS, PLATE_COLORS
 
 logger = logging.getLogger(__name__)
 
+SINGLE_LABEL_WIDTH = 31
+
 # CSS3 named colors cache (loaded lazily from data/css3_colors.json)
 _css3_colors_cache: Optional[Dict[str, List[int]]] = None
 
@@ -234,13 +236,22 @@ def _format_support_value(support: str, is_custom: bool) -> str:
 # ═══════════════════════════════════════════════════════════════
 
 def _print_header(console: Console, filename: str):
-    console.print(Panel(f"[bold cyan]3MF SETTINGS ANALYZER[/bold cyan]  │  {filename}",
-                        border_style="cyan"))
+    table = Table(
+        show_header=False, box=box.SIMPLE, show_edge=False,
+        padding=(0, 2), expand=True, border_style="dim bright_yellow",
+    )
+    table.add_column("", width=SINGLE_LABEL_WIDTH)
+    table.add_column(ratio=1)
+    table.add_row(
+        "[bold bright_yellow]3MF SETTINGS ANALYZER:[/bold bright_yellow]",
+        f"[bold white]{filename}[/bold white]",
+    )
+    console.print(Panel(table, border_style="dim bright_yellow"))
 
 
 def _print_profile_panel(console: Console, profile: Dict[str, Any]):
     profile_table = Table(show_header=False, box=None, padding=(0, 2))
-    profile_table.add_column("Key", style="dim")
+    profile_table.add_column("Key", style="dim", width=SINGLE_LABEL_WIDTH)
     profile_table.add_column("Value")
 
     profile_table.add_row("Printer", f"[white]{profile['printer']}[/white]")
@@ -257,7 +268,7 @@ def _print_profile_panel(console: Console, profile: Dict[str, Any]):
 
 def _print_global_settings(console: Console, profile: Dict[str, Any], wiki_label):
     gs = Table(show_header=False, box=None, padding=(0, 2))
-    gs.add_column("Key", style="dim")
+    gs.add_column("Key", style="dim", width=SINGLE_LABEL_WIDTH)
     gs.add_column("Value", style="white")
 
     # -- Basic --
@@ -347,7 +358,7 @@ def _print_custom_global(console: Console, custom: Dict[str, Any], wiki_key):
     if not custom:
         return
     custom_table = Table(show_header=False, box=None, padding=(0, 2))
-    custom_table.add_column("Key", style="yellow")
+    custom_table.add_column("Key", style="yellow", width=SINGLE_LABEL_WIDTH, no_wrap=True)
     custom_table.add_column("Value", style="white")
     for k, v in custom.items():
         custom_table.add_row(f"* {wiki_key(k)}", escape(str(v)))
@@ -362,7 +373,7 @@ def _print_statistics_panel(console: Console, statistics: Dict[str, Any]):
         return
 
     stats_table = Table(show_header=False, box=None, padding=(0, 2))
-    stats_table.add_column("Key", style="dim")
+    stats_table.add_column("Key", style="dim", width=SINGLE_LABEL_WIDTH)
     stats_table.add_column("Value", style="white")
 
     # Slicer info and file
@@ -656,8 +667,17 @@ def print_gcode_results(result: Dict[str, Any], show_diff: bool = False, no_colo
     profile = result['profile']
 
     # Use different header for gcode
-    console.print(Panel(f"[bold cyan]GCODE SETTINGS ANALYZER[/bold cyan]  |  {result['file']}",
-                        border_style="cyan"))
+    header_table = Table(
+        show_header=False, box=box.SIMPLE, show_edge=False,
+        padding=(0, 2), expand=True, border_style="dim bright_yellow",
+    )
+    header_table.add_column("", width=SINGLE_LABEL_WIDTH)
+    header_table.add_column(ratio=1)
+    header_table.add_row(
+        "[bold bright_yellow]GCODE SETTINGS ANALYZER:[/bold bright_yellow]",
+        f"[bold white]{result['file']}[/bold white]",
+    )
+    console.print(Panel(header_table, border_style="dim bright_yellow"))
 
     # Profile panel (same as 3MF) - at the top
     _print_profile_panel(console, profile)
