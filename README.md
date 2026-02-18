@@ -387,8 +387,8 @@ The analyzer parses:
 │   ├── gcode.py                # GcodeAnalyzer class
 │   ├── output.py               # Rich formatting: panels, tables, colors, helpers
 │   ├── compare.py              # Side-by-side comparison for 2-4 files with diff highlighting
-│   └── cli.py                  # argparse, main(), multi-file routing, setup_logging()
-├── settings_wiki.py        # OrcaSlicer settings reference module
+│   ├── cli.py                  # argparse, main(), multi-file routing, setup_logging()
+│   └── settings_wiki.py       # OrcaSlicer settings reference module
 ├── tests/                  # Unit tests
 │   ├── conftest.py             # Pytest fixtures (3MF + Gcode)
 │   ├── test_constants.py       # Tests for core.constants

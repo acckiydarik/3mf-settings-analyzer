@@ -1,5 +1,7 @@
 """Shared constants for the 3MF Settings Analyzer."""
 
+from typing import Any, Callable, Dict
+
 # System metadata keys that are not custom print settings
 SYSTEM_KEYS = frozenset({
     'name', 'matrix', 'extruder', 'face_count',
@@ -40,3 +42,76 @@ GCODE_HEADER_END = '; HEADER_BLOCK_END'
 GCODE_CONFIG_START = '; CONFIG_BLOCK_START'
 GCODE_CONFIG_END = '; CONFIG_BLOCK_END'
 GCODE_OBJECT_MARKER = '; printing object '
+
+# Common profile setting keys shared by ThreeMFAnalyzer and GcodeAnalyzer.
+# Each tuple is (output_key, source_key) -- both analyzers read from the same
+# slicer key names for these settings.  The few settings that differ between
+# 3MF and Gcode formats are handled individually in each analyzer.
+COMMON_PROFILE_KEYS: tuple = (
+    # Basic
+    ('layer_height', 'layer_height'),
+    ('nozzle', 'nozzle_diameter'),
+    ('line_width', 'line_width'),
+    ('wall_loops', 'wall_loops'),
+    ('sparse_infill_density', 'sparse_infill_density'),
+    ('brim_type', 'brim_type'),
+    ('enable_support', 'enable_support'),
+    # Flow
+    ('print_flow_ratio', 'print_flow_ratio'),
+    ('filament_flow_ratio', 'filament_flow_ratio'),
+    # Speeds
+    ('initial_layer_speed', 'initial_layer_speed'),
+    ('outer_wall_speed', 'outer_wall_speed'),
+    ('inner_wall_speed', 'inner_wall_speed'),
+    ('sparse_infill_speed', 'sparse_infill_speed'),
+    ('top_surface_speed', 'top_surface_speed'),
+    ('travel_speed', 'travel_speed'),
+    ('bridge_speed', 'bridge_speed'),
+    # Shells
+    ('top_shell_layers', 'top_shell_layers'),
+    ('bottom_shell_layers', 'bottom_shell_layers'),
+    # Seams
+    ('seam_position', 'seam_position'),
+    # Patterns
+    ('sparse_infill_pattern', 'sparse_infill_pattern'),
+    ('top_surface_pattern', 'top_surface_pattern'),
+    # Special modes
+    ('ironing_type', 'ironing_type'),
+    ('fuzzy_skin', 'fuzzy_skin'),
+    ('spiral_mode', 'spiral_mode'),
+    # Retraction and Z
+    ('retraction_length', 'retraction_length'),
+    ('retraction_speed', 'retraction_speed'),
+    ('z_hop', 'z_hop'),
+    # Fan
+    ('fan_min_speed', 'fan_min_speed'),
+    ('fan_max_speed', 'fan_max_speed'),
+    # Cooling
+    ('slow_down_for_layer_cooling', 'slow_down_for_layer_cooling'),
+    ('slow_down_layer_time', 'slow_down_layer_time'),
+    # Advanced
+    ('pressure_advance', 'pressure_advance'),
+    ('enable_arc_fitting', 'enable_arc_fitting'),
+    ('enable_overhang_speed', 'enable_overhang_speed'),
+    # Print modes
+    ('print_sequence', 'print_sequence'),
+    ('timelapse_type', 'timelapse_type'),
+    # Supports
+    ('support_type', 'support_type'),
+    # Temperatures
+    ('nozzle_temperature', 'nozzle_temperature'),
+    ('bed_temperature', 'hot_plate_temp'),
+)
+
+
+def build_common_profile(getter: Callable[..., Any]) -> Dict[str, Any]:
+    """Build profile dict from COMMON_PROFILE_KEYS using the provided getter.
+
+    Args:
+        getter: Callable with signature (key, default) -> value.
+                Typically ``self._get_value`` from an analyzer class.
+
+    Returns:
+        Dict with profile settings populated via the getter.
+    """
+    return {out_key: getter(src_key, '') for out_key, src_key in COMMON_PROFILE_KEYS}

@@ -7,10 +7,10 @@ reference with labels, descriptions, units, categories, and wiki page links.
 
 Usage:
     As a module:
-        from settings_wiki import get_wiki_url, get_setting_info
+        from core.settings_wiki import get_wiki_url, get_setting_info
 
-    Update data from GitHub:
-        python settings_wiki.py
+    Update wiki data:
+        python analyze.py --update-wiki
 """
 
 import hashlib
@@ -307,11 +307,11 @@ def _build_settings_data() -> dict:
     config_path = _DATA_DIR / "PrintConfig.cpp"
 
     if not tab_path.exists():
-        logger.error("Tab.cpp not found in %s. Run 'python settings_wiki.py' to download.", _DATA_DIR)
+        logger.error("Tab.cpp not found in %s. Run 'python analyze.py --update-wiki' to download.", _DATA_DIR)
         return {"_meta": {}, "settings": {}}
 
     if not config_path.exists():
-        logger.error("PrintConfig.cpp not found in %s. Run 'python settings_wiki.py' to download.", _DATA_DIR)
+        logger.error("PrintConfig.cpp not found in %s. Run 'python analyze.py --update-wiki' to download.", _DATA_DIR)
         return {"_meta": {}, "settings": {}}
 
     # Read source files

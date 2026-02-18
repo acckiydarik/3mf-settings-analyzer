@@ -41,7 +41,7 @@ def _make_wiki_helpers(enabled: bool) -> Tuple[Callable[[str, str], str], Callab
         )
 
     try:
-        from settings_wiki import get_wiki_url
+        from core.settings_wiki import get_wiki_url
     except ImportError as e:
         logger.warning("Wiki module unavailable: %s. Wiki links disabled.", e)
         return (

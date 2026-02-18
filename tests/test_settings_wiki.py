@@ -1,4 +1,4 @@
-"""Unit tests for settings_wiki.py module."""
+"""Unit tests for core.settings_wiki module."""
 
 import json
 import sys
@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from settings_wiki import (
+from core.settings_wiki import (
     _parse_print_config,
     _parse_tab_cpp,
     _build_settings_data,
@@ -148,7 +148,7 @@ class TestGetWikiUrl:
     def test_returns_url_for_known_setting(self):
         """Should return full URL for settings with wiki_page."""
         # This test depends on actual data, so we mock
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_cache.return_value = {
                 '_meta': {'wiki_base': 'https://example.com/wiki/'},
                 'settings': {
@@ -161,7 +161,7 @@ class TestGetWikiUrl:
 
     def test_returns_none_for_unknown_setting(self):
         """Should return None for unknown settings."""
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_cache.return_value = {
                 '_meta': {},
                 'settings': {}
@@ -172,7 +172,7 @@ class TestGetWikiUrl:
 
     def test_returns_none_when_no_wiki_page(self):
         """Should return None when setting exists but has no wiki_page."""
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_cache.return_value = {
                 '_meta': {},
                 'settings': {
@@ -193,7 +193,7 @@ class TestGetSettingInfo:
 
     def test_returns_dict_for_known_setting(self):
         """Should return full metadata dict for known settings."""
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_cache.return_value = {
                 '_meta': {},
                 'settings': {
@@ -213,7 +213,7 @@ class TestGetSettingInfo:
 
     def test_returns_none_for_unknown_setting(self):
         """Should return None for unknown settings."""
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_cache.return_value = {
                 '_meta': {},
                 'settings': {}
@@ -232,7 +232,7 @@ class TestGetAllSettings:
 
     def test_returns_all_settings(self):
         """Should return complete settings dictionary."""
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_data = {
                 '_meta': {},
                 'settings': {
@@ -248,7 +248,7 @@ class TestGetAllSettings:
 
     def test_returns_empty_dict_when_no_settings(self):
         """Should return empty dict when no settings loaded."""
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_cache.return_value = {'_meta': {}, 'settings': {}}
             
             all_settings = get_all_settings()
@@ -264,7 +264,7 @@ class TestGetMeta:
 
     def test_returns_metadata(self):
         """Should return metadata dictionary."""
-        with patch('settings_wiki._load_cache') as mock_cache:
+        with patch('core.settings_wiki._load_cache') as mock_cache:
             mock_cache.return_value = {
                 '_meta': {
                     'updated': '2025-01-01 12:00 UTC',
@@ -335,11 +335,11 @@ class TestThreadSafety:
         
         def load_and_store():
             try:
-                with patch('settings_wiki._JSON_PATH') as mock_path:
+                with patch('core.settings_wiki._JSON_PATH') as mock_path:
                     mock_path.exists.return_value = False
                     # Simulate cache already set
-                    import settings_wiki
-                    settings_wiki._cache = {'_meta': {}, 'settings': {}}
+                    import core.settings_wiki as sw
+                    sw._cache = {'_meta': {}, 'settings': {}}
                     
                     data = get_all_settings()
                     results.append(data)
@@ -382,9 +382,9 @@ class TestUpdate:
         """update() should download files if local files are missing."""
         fake_content = b'// fake C++ content'
         
-        with patch('settings_wiki._DATA_DIR', tmp_path), \
-             patch('settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'), \
-             patch('settings_wiki.urllib.request.urlopen') as mock_url:
+        with patch('core.settings_wiki._DATA_DIR', tmp_path), \
+             patch('core.settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'), \
+             patch('core.settings_wiki.urllib.request.urlopen') as mock_url:
             
             mock_url.return_value = mock_urlopen(fake_content)
             
@@ -398,9 +398,9 @@ class TestUpdate:
         """update(force=True) should always download."""
         fake_content = b'// fake C++ content'
         
-        with patch('settings_wiki._DATA_DIR', tmp_path), \
-             patch('settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'), \
-             patch('settings_wiki.urllib.request.urlopen') as mock_url:
+        with patch('core.settings_wiki._DATA_DIR', tmp_path), \
+             patch('core.settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'), \
+             patch('core.settings_wiki.urllib.request.urlopen') as mock_url:
             
             mock_url.return_value = mock_urlopen(fake_content)
             
@@ -427,9 +427,9 @@ class TestUpdate:
         (tmp_path / 'Tab.cpp').write_bytes(fake_content)
         (tmp_path / 'PrintConfig.cpp').write_bytes(fake_content)
         
-        with patch('settings_wiki._DATA_DIR', tmp_path), \
-             patch('settings_wiki._JSON_PATH', json_path), \
-             patch('settings_wiki.urllib.request.urlopen') as mock_url:
+        with patch('core.settings_wiki._DATA_DIR', tmp_path), \
+             patch('core.settings_wiki._JSON_PATH', json_path), \
+             patch('core.settings_wiki.urllib.request.urlopen') as mock_url:
             
             mock_url.return_value = mock_urlopen(fake_content)
             
@@ -455,10 +455,10 @@ class TestUpdate:
         (tmp_path / 'Tab.cpp').write_bytes(old_content)
         (tmp_path / 'PrintConfig.cpp').write_bytes(old_content)
         
-        with patch('settings_wiki._DATA_DIR', tmp_path), \
-             patch('settings_wiki._JSON_PATH', json_path), \
-             patch('settings_wiki.urllib.request.urlopen') as mock_url, \
-             patch('settings_wiki.generate_json'):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path), \
+             patch('core.settings_wiki._JSON_PATH', json_path), \
+             patch('core.settings_wiki.urllib.request.urlopen') as mock_url, \
+             patch('core.settings_wiki.generate_json'):
             
             mock_url.return_value = mock_urlopen(new_content)
             
@@ -481,7 +481,7 @@ class TestDownloadFile:
         response.__enter__ = lambda s: s
         response.__exit__ = MagicMock(return_value=False)
         
-        with patch('settings_wiki.urllib.request.urlopen', return_value=response):
+        with patch('core.settings_wiki.urllib.request.urlopen', return_value=response):
             result = _download_file('https://example.com/file.cpp', dest)
         
         assert result is True
@@ -494,7 +494,7 @@ class TestDownloadFile:
         
         dest = tmp_path / 'test_file.cpp'
         
-        with patch('settings_wiki.urllib.request.urlopen') as mock_url:
+        with patch('core.settings_wiki.urllib.request.urlopen') as mock_url:
             mock_url.side_effect = urllib.error.URLError('Connection refused')
             
             result = _download_file('https://example.com/file.cpp', dest)
@@ -515,7 +515,7 @@ class TestCLIUpdateWiki:
         from analyze import main
         
         with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
-             patch('settings_wiki.update') as mock_update:
+             patch('core.settings_wiki.update') as mock_update:
             
             mock_update.return_value = True
             
@@ -531,7 +531,7 @@ class TestCLIUpdateWiki:
         from analyze import main
         
         with patch.object(sys, 'argv', ['analyze.py', '--force-update-wiki']), \
-             patch('settings_wiki.update') as mock_update:
+             patch('core.settings_wiki.update') as mock_update:
             
             mock_update.return_value = True
             
@@ -546,7 +546,7 @@ class TestCLIUpdateWiki:
         from analyze import main
         
         with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
-             patch('settings_wiki.update') as mock_update:
+             patch('core.settings_wiki.update') as mock_update:
             
             mock_update.return_value = False  # Already up to date
             
@@ -561,7 +561,7 @@ class TestCLIUpdateWiki:
         from analyze import main
         
         with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
-             patch('settings_wiki.update') as mock_update:
+             patch('core.settings_wiki.update') as mock_update:
             
             mock_update.side_effect = Exception('Network error')
             
@@ -581,7 +581,7 @@ class TestBuildSettingsData:
 
     def test_returns_empty_when_tab_cpp_missing(self, tmp_path: Path):
         """Should return empty data when Tab.cpp is missing."""
-        with patch('settings_wiki._DATA_DIR', tmp_path):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path):
             result = _build_settings_data()
             
             assert result == {'_meta': {}, 'settings': {}}
@@ -590,7 +590,7 @@ class TestBuildSettingsData:
         """Should return empty data when PrintConfig.cpp is missing."""
         (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
         
-        with patch('settings_wiki._DATA_DIR', tmp_path):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path):
             result = _build_settings_data()
             
             assert result == {'_meta': {}, 'settings': {}}
@@ -600,7 +600,7 @@ class TestBuildSettingsData:
         (tmp_path / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
         (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
         
-        with patch('settings_wiki._DATA_DIR', tmp_path):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path):
             result = _build_settings_data()
         
         assert '_meta' in result
@@ -615,7 +615,7 @@ class TestBuildSettingsData:
         (tmp_path / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
         (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
         
-        with patch('settings_wiki._DATA_DIR', tmp_path):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path):
             result = _build_settings_data()
         
         # layer_height should have wiki_page from Tab.cpp
@@ -627,7 +627,7 @@ class TestBuildSettingsData:
         (tmp_path / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
         (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
         
-        with patch('settings_wiki._DATA_DIR', tmp_path):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path):
             result = _build_settings_data()
         
         meta = result['_meta']
@@ -650,7 +650,7 @@ class TestBuildSettingsData:
         (tmp_path / 'PrintConfig.cpp').write_text(extended_printconfig)
         (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
         
-        with patch('settings_wiki._DATA_DIR', tmp_path):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path):
             result = _build_settings_data()
         
         # bridge_speed should have fallback wiki_page
@@ -667,24 +667,15 @@ class TestGenerateJson:
 
     def test_generate_json_creates_file(self, tmp_path: Path, sample_printconfig_cpp: str, sample_tab_cpp: str):
         """generate_json should create settings_wiki.json file."""
-        from settings_wiki import generate_json, _DATA_DIR, _JSON_PATH
+        from core.settings_wiki import generate_json
         
-        # Mock the data directory to use temp path
-        with patch('settings_wiki._DATA_DIR', tmp_path), \
-             patch('settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'):
+        with patch('core.settings_wiki._DATA_DIR', tmp_path), \
+             patch('core.settings_wiki._JSON_PATH', tmp_path / 'settings_wiki.json'):
             
-            # Write sample .cpp files
             (tmp_path / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
             (tmp_path / 'Tab.cpp').write_text(sample_tab_cpp)
             
-            from settings_wiki import generate_json
-            # Reimport to pick up patched paths
-            import importlib
-            import settings_wiki
-            importlib.reload(settings_wiki)
-            
-            # This test verifies the function can be called
-            # Full test requires mocking file paths
+            generate_json()
 
     def test_generate_json_returns_path(self, tmp_path: Path, sample_printconfig_cpp: str, sample_tab_cpp: str):
         """generate_json should return path to generated file."""
@@ -694,15 +685,13 @@ class TestGenerateJson:
         (data_dir / 'PrintConfig.cpp').write_text(sample_printconfig_cpp)
         (data_dir / 'Tab.cpp').write_text(sample_tab_cpp)
         
-        with patch('settings_wiki._DATA_DIR', data_dir), \
-             patch('settings_wiki._JSON_PATH', data_dir / 'settings_wiki.json'):
+        with patch('core.settings_wiki._DATA_DIR', data_dir), \
+             patch('core.settings_wiki._JSON_PATH', data_dir / 'settings_wiki.json'):
             
-            import settings_wiki
-            # Clear cache
-            settings_wiki._cache = None
+            import core.settings_wiki as sw
+            sw._cache = None
             
-            # generate_json builds from _DATA_DIR files
-            result = settings_wiki.generate_json()
+            result = sw.generate_json()
             
             assert result.exists()
             assert result.name == 'settings_wiki.json'
@@ -717,7 +706,7 @@ class TestGetGithubSha:
 
     def test_get_github_sha_success(self):
         """_get_github_sha should return SHA on success."""
-        from settings_wiki import _get_github_sha
+        from core.settings_wiki import _get_github_sha
         
         mock_response = json.dumps({"sha": "abc123def456"}).encode()
         
@@ -731,7 +720,7 @@ class TestGetGithubSha:
 
     def test_get_github_sha_network_error(self):
         """_get_github_sha should return None on network error."""
-        from settings_wiki import _get_github_sha
+        from core.settings_wiki import _get_github_sha
         import urllib.error
         
         with patch('urllib.request.urlopen') as mock_urlopen:
@@ -743,7 +732,7 @@ class TestGetGithubSha:
 
     def test_get_github_sha_invalid_json(self):
         """_get_github_sha should return None on invalid JSON response."""
-        from settings_wiki import _get_github_sha
+        from core.settings_wiki import _get_github_sha
         
         with patch('urllib.request.urlopen') as mock_urlopen:
             mock_urlopen.return_value.__enter__ = MagicMock(return_value=BytesIO(b"not json"))

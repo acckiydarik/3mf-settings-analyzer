@@ -476,3 +476,91 @@ class TestPrintGcodeResults:
         analyzer = GcodeAnalyzer(sample_gcode)
         result = analyzer.analyze()
         print_gcode_results(result, wiki=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Edge-case tests for print functions
+# ═══════════════════════════════════════════════════════════════
+
+class TestPrintResultsEdgeCases:
+    """Edge-case tests to ensure print functions don't crash."""
+
+    def test_empty_3mf(self, empty_3mf: Path):
+        """print_results should handle empty 3MF (no objects, unknown profile)."""
+        analyzer = ThreeMFAnalyzer(empty_3mf)
+        result = analyzer.analyze()
+        print_results(result)
+
+    def test_multi_plate(self, multi_plate_3mf: Path):
+        """print_results should handle multiple plates."""
+        analyzer = ThreeMFAnalyzer(multi_plate_3mf)
+        result = analyzer.analyze()
+        print_results(result, show_diff=True)
+
+    def test_multi_part_object(self, multi_part_object_3mf: Path):
+        """print_results should handle objects with multiple parts."""
+        analyzer = ThreeMFAnalyzer(multi_part_object_3mf)
+        result = analyzer.analyze()
+        print_results(result, show_diff=True)
+
+    def test_unicode_names(self, unicode_names_3mf: Path):
+        """print_results should handle unicode object/part names safely."""
+        analyzer = ThreeMFAnalyzer(unicode_names_3mf)
+        result = analyzer.analyze()
+        print_results(result)
+
+    def test_empty_list_settings(self, empty_list_settings_3mf: Path):
+        """print_results should handle empty list values in settings."""
+        analyzer = ThreeMFAnalyzer(empty_list_settings_3mf)
+        result = analyzer.analyze()
+        print_results(result)
+
+    def test_minimal_gcode(self, minimal_gcode: Path):
+        """print_gcode_results should handle minimal gcode (no CONFIG_BLOCK)."""
+        analyzer = GcodeAnalyzer(minimal_gcode)
+        result = analyzer.analyze()
+        print_gcode_results(result)
+
+    def test_gcode_no_objects(self, gcode_no_objects: Path):
+        """print_gcode_results should handle gcode without object markers."""
+        analyzer = GcodeAnalyzer(gcode_no_objects)
+        result = analyzer.analyze()
+        print_gcode_results(result)
+
+    def test_gcode_unicode_objects(self, gcode_unicode_objects: Path):
+        """print_gcode_results should handle unicode object names."""
+        analyzer = GcodeAnalyzer(gcode_unicode_objects)
+        result = analyzer.analyze()
+        print_gcode_results(result)
+
+    def test_empty_gcode(self, empty_gcode: Path):
+        """print_gcode_results should handle empty gcode file."""
+        analyzer = GcodeAnalyzer(empty_gcode)
+        result = analyzer.analyze()
+        print_gcode_results(result)
+
+    def test_3mf_all_flags_combined(self, multi_part_object_3mf: Path):
+        """print_results should handle all flags at once."""
+        analyzer = ThreeMFAnalyzer(multi_part_object_3mf)
+        result = analyzer.analyze()
+        print_results(result, show_diff=True, no_color=True, wiki=True)
+
+    def test_gcode_all_flags_combined(self, sample_gcode: Path):
+        """print_gcode_results should handle all flags at once."""
+        analyzer = GcodeAnalyzer(sample_gcode)
+        result = analyzer.analyze()
+        print_gcode_results(result, show_diff=True, no_color=True, wiki=True)
+
+    def test_print_results_no_custom_global(self, sample_3mf: Path):
+        """print_results should handle result with empty custom_global."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        result = analyzer.analyze()
+        result['custom_global'] = {}
+        print_results(result)
+
+    def test_print_results_no_rows(self, sample_3mf: Path):
+        """print_results should handle result with no rows."""
+        analyzer = ThreeMFAnalyzer(sample_3mf)
+        result = analyzer.analyze()
+        result['rows'] = []
+        print_results(result)

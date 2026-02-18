@@ -11,6 +11,7 @@ from core.constants import (
     GCODE_CONFIG_START,
     GCODE_HEADER_END,
     GCODE_OBJECT_MARKER,
+    build_common_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -258,65 +259,13 @@ class GcodeAnalyzer:
 
     def _get_profile_info(self) -> Dict[str, Any]:
         """Extract profile information matching ThreeMFAnalyzer format."""
-        return {
-            'printer': self.settings.get('printer_settings_id', 'Unknown'),
-            'process': self.settings.get('print_settings_id', 'Unknown'),
-            'filaments': self._get_list_value('filament_settings_id', ['Unknown']),
-            # Basic settings
-            'layer_height': self._get_value('layer_height', ''),
-            'initial_layer_print_height': self._get_value('first_layer_height', ''),
-            'nozzle': self._get_value('nozzle_diameter', ''),
-            'line_width': self._get_value('line_width', ''),
-            'wall_loops': self._get_value('wall_loops', ''),
-            'sparse_infill_density': self._get_value('sparse_infill_density', ''),
-            'brim_type': self._get_value('brim_type', ''),
-            'enable_support': self._get_value('enable_support', ''),
-            # Flow
-            'print_flow_ratio': self._get_value('print_flow_ratio', ''),
-            'filament_flow_ratio': self._get_value('filament_flow_ratio', ''),
-            # Speeds
-            'initial_layer_speed': self._get_value('initial_layer_speed', ''),
-            'outer_wall_speed': self._get_value('outer_wall_speed', ''),
-            'inner_wall_speed': self._get_value('inner_wall_speed', ''),
-            'sparse_infill_speed': self._get_value('sparse_infill_speed', ''),
-            'top_surface_speed': self._get_value('top_surface_speed', ''),
-            'travel_speed': self._get_value('travel_speed', ''),
-            'bridge_speed': self._get_value('bridge_speed', ''),
-            # Shells
-            'top_shell_layers': self._get_value('top_shell_layers', ''),
-            'bottom_shell_layers': self._get_value('bottom_shell_layers', ''),
-            # Seams
-            'seam_position': self._get_value('seam_position', ''),
-            # Patterns
-            'sparse_infill_pattern': self._get_value('sparse_infill_pattern', ''),
-            'top_surface_pattern': self._get_value('top_surface_pattern', ''),
-            # Special modes
-            'ironing_type': self._get_value('ironing_type', ''),
-            'fuzzy_skin': self._get_value('fuzzy_skin', ''),
-            'spiral_mode': self._get_value('spiral_mode', ''),
-            # Retraction and Z
-            'retraction_length': self._get_value('retraction_length', ''),
-            'retraction_speed': self._get_value('retraction_speed', ''),
-            'z_hop': self._get_value('z_hop', ''),
-            # Fan
-            'fan_min_speed': self._get_value('fan_min_speed', ''),
-            'fan_max_speed': self._get_value('fan_max_speed', ''),
-            # Cooling
-            'slow_down_for_layer_cooling': self._get_value('slow_down_for_layer_cooling', ''),
-            'slow_down_layer_time': self._get_value('slow_down_layer_time', ''),
-            # Advanced
-            'pressure_advance': self._get_value('pressure_advance', ''),
-            'enable_arc_fitting': self._get_value('enable_arc_fitting', ''),
-            'enable_overhang_speed': self._get_value('enable_overhang_speed', ''),
-            # Print modes
-            'print_sequence': self._get_value('print_sequence', ''),
-            'timelapse_type': self._get_value('timelapse_type', ''),
-            # Supports
-            'support_type': self._get_value('support_type', ''),
-            # Temperatures
-            'nozzle_temperature': self._get_value('nozzle_temperature', ''),
-            'bed_temperature': self._get_value('hot_plate_temp', ''),
-        }
+        profile = build_common_profile(self._get_value)
+        profile['printer'] = self.settings.get('printer_settings_id', 'Unknown')
+        profile['process'] = self.settings.get('print_settings_id', 'Unknown')
+        profile['filaments'] = self._get_list_value('filament_settings_id', ['Unknown'])
+        # Gcode uses 'first_layer_height' instead of 'initial_layer_print_height'
+        profile['initial_layer_print_height'] = self._get_value('first_layer_height', '')
+        return profile
 
     def _build_statistics(self) -> Dict[str, Any]:
         """Build comprehensive statistics dictionary."""

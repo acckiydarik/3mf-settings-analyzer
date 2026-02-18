@@ -274,36 +274,24 @@ class TestWikiUpdateCLI:
 
     def test_update_wiki_success(self):
         """--update-wiki should call wiki update and exit 0."""
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']):
-            with patch('core.cli.Console'):
-                with patch.dict('sys.modules', {'settings_wiki': type(sys)('settings_wiki')}):
-                    import sys as _sys
-                    _sys.modules['settings_wiki'].update = lambda force=False: True
-                    with pytest.raises(SystemExit) as exc_info:
-                        main()
-                    assert exc_info.value.code == 0
+        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+             patch('core.settings_wiki.update', return_value=True):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 0
 
     def test_update_wiki_already_up_to_date(self):
         """--update-wiki should handle 'already up to date' case."""
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']):
-            with patch('core.cli.Console'):
-                with patch.dict('sys.modules', {'settings_wiki': type(sys)('settings_wiki')}):
-                    import sys as _sys
-                    _sys.modules['settings_wiki'].update = lambda force=False: False
-                    with pytest.raises(SystemExit) as exc_info:
-                        main()
-                    assert exc_info.value.code == 0
+        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+             patch('core.settings_wiki.update', return_value=False):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 0
 
     def test_update_wiki_failure_exits_1(self):
         """--update-wiki should exit(1) if update raises an exception."""
-        def _fail(force=False):
-            raise RuntimeError("Network error")
-
-        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']):
-            with patch('core.cli.Console'):
-                with patch.dict('sys.modules', {'settings_wiki': type(sys)('settings_wiki')}):
-                    import sys as _sys
-                    _sys.modules['settings_wiki'].update = _fail
-                    with pytest.raises(SystemExit) as exc_info:
-                        main()
-                    assert exc_info.value.code == 1
+        with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']), \
+             patch('core.settings_wiki.update', side_effect=RuntimeError("Network error")):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 1

@@ -50,7 +50,7 @@ def _preload_wiki(args) -> None:
     if not args.wiki or args.json:
         return
     try:
-        from settings_wiki import _load_cache, _JSON_PATH
+        from core.settings_wiki import _load_cache, _JSON_PATH
         if not _JSON_PATH.exists():
             console = Console(no_color=args.no_color)
             console.print("[cyan]Downloading wiki data from OrcaSlicer GitHub...[/cyan]")
@@ -203,7 +203,7 @@ Examples:
 
     # Handle wiki update commands (no file required)
     if args.update_wiki or args.force_update_wiki:
-        from settings_wiki import update as wiki_update
+        from core.settings_wiki import update as wiki_update
         console = Console(no_color=args.no_color)
         console.print("[cyan]Updating wiki data from OrcaSlicer GitHub...[/cyan]")
         try:
