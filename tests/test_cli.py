@@ -1,4 +1,4 @@
-"""Unit tests for analyzer.cli module."""
+"""Unit tests for core.cli module."""
 
 import json
 import sys
@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from analyzer.cli import _get_file_type, main, setup_logging
+from core.cli import _get_file_type, main, setup_logging
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -92,7 +92,7 @@ class TestCLI:
 
     def test_main_version_output(self, capsys):
         """--version flag should print version and exit."""
-        from analyzer import __version__
+        from core import __version__
         with patch.object(sys, 'argv', ['analyze.py', '--version']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -275,7 +275,7 @@ class TestWikiUpdateCLI:
     def test_update_wiki_success(self):
         """--update-wiki should call wiki update and exit 0."""
         with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']):
-            with patch('analyzer.cli.Console'):
+            with patch('core.cli.Console'):
                 with patch.dict('sys.modules', {'settings_wiki': type(sys)('settings_wiki')}):
                     import sys as _sys
                     _sys.modules['settings_wiki'].update = lambda force=False: True
@@ -286,7 +286,7 @@ class TestWikiUpdateCLI:
     def test_update_wiki_already_up_to_date(self):
         """--update-wiki should handle 'already up to date' case."""
         with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']):
-            with patch('analyzer.cli.Console'):
+            with patch('core.cli.Console'):
                 with patch.dict('sys.modules', {'settings_wiki': type(sys)('settings_wiki')}):
                     import sys as _sys
                     _sys.modules['settings_wiki'].update = lambda force=False: False
@@ -300,7 +300,7 @@ class TestWikiUpdateCLI:
             raise RuntimeError("Network error")
 
         with patch.object(sys, 'argv', ['analyze.py', '--update-wiki']):
-            with patch('analyzer.cli.Console'):
+            with patch('core.cli.Console'):
                 with patch.dict('sys.modules', {'settings_wiki': type(sys)('settings_wiki')}):
                     import sys as _sys
                     _sys.modules['settings_wiki'].update = _fail

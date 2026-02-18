@@ -17,7 +17,7 @@ except ImportError:
         "Install it with: pip install defusedxml"
     )
 
-from analyzer.constants import (
+from core.constants import (
     BOOL_TRUE,
     DEFAULT_EXTRUDER,
     DEFAULT_IDENTIFY_ID,

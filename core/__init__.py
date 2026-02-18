@@ -7,10 +7,10 @@ Supports Bambu Studio, OrcaSlicer, Snapmaker Orca, and other slicers using the s
 
 __version__ = "2.0.0"
 
-from analyzer.threemf import ThreeMFAnalyzer
-from analyzer.gcode import GcodeAnalyzer
-from analyzer.output import print_results, print_gcode_results
-from analyzer.cli import main, setup_logging
+from core.threemf import ThreeMFAnalyzer
+from core.gcode import GcodeAnalyzer
+from core.output import print_results, print_gcode_results
+from core.cli import main, setup_logging
 
 __all__ = [
     "__version__",

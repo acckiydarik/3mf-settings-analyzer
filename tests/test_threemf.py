@@ -1,4 +1,4 @@
-"""Unit tests for analyzer.threemf module."""
+"""Unit tests for core.threemf module."""
 
 import json
 import logging
@@ -8,7 +8,7 @@ from xml.etree.ElementTree import ParseError
 
 import pytest
 
-from analyzer.threemf import ThreeMFAnalyzer, _is_custom
+from core.threemf import ThreeMFAnalyzer, _is_custom
 
 
 # ═══════════════════════════════════════════════════════════════

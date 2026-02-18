@@ -11,7 +11,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from analyzer.constants import BOOL_TRUE, FILAMENT_COLORS, PLATE_COLORS
+from core.constants import BOOL_TRUE, FILAMENT_COLORS, PLATE_COLORS
 
 logger = logging.getLogger(__name__)
 

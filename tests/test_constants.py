@@ -1,6 +1,6 @@
-"""Unit tests for analyzer.constants module."""
+"""Unit tests for core.constants module."""
 
-from analyzer.constants import (
+from core.constants import (
     BOOL_FALSE,
     BOOL_TRUE,
     DEFAULT_EXTRUDER,

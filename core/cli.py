@@ -10,11 +10,11 @@ from xml.etree.ElementTree import ParseError
 
 from rich.console import Console
 
-from analyzer import __version__
-from analyzer.constants import FILE_EXTENSION_3MF, FILE_EXTENSION_GCODE
-from analyzer.gcode import GcodeAnalyzer
-from analyzer.output import print_gcode_results, print_results
-from analyzer.threemf import ThreeMFAnalyzer
+from core import __version__
+from core.constants import FILE_EXTENSION_3MF, FILE_EXTENSION_GCODE
+from core.gcode import GcodeAnalyzer
+from core.output import print_gcode_results, print_results
+from core.threemf import ThreeMFAnalyzer
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,11 @@
-"""Unit tests for analyzer.output module."""
+"""Unit tests for core.output module."""
 
 from pathlib import Path
 
 import pytest
 
-from analyzer.gcode import GcodeAnalyzer
-from analyzer.output import (
+from core.gcode import GcodeAnalyzer
+from core.output import (
     _find_nearest_css3_color,
     _format_file_size,
     _format_filament_list,
@@ -17,7 +17,7 @@ from analyzer.output import (
     print_gcode_results,
     print_results,
 )
-from analyzer.threemf import ThreeMFAnalyzer
+from core.threemf import ThreeMFAnalyzer
 
 
 # ═══════════════════════════════════════════════════════════════

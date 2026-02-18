@@ -1,10 +1,10 @@
-"""Unit tests for analyzer.gcode module."""
+"""Unit tests for core.gcode module."""
 
 from pathlib import Path
 
 import pytest
 
-from analyzer.gcode import GcodeAnalyzer
+from core.gcode import GcodeAnalyzer
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Set, Union
 
-from analyzer.constants import (
+from core.constants import (
     GCODE_CONFIG_END,
     GCODE_CONFIG_START,
     GCODE_HEADER_END,

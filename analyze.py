@@ -7,7 +7,7 @@ Run directly:
     python analyze.py model.gcode --diff
 """
 
-from analyzer.cli import main
+from core.cli import main
 
 if __name__ == "__main__":
     main()
