@@ -57,28 +57,34 @@ class ThreeMFAnalyzer:
     def analyze(self) -> Dict[str, Any]:
         """Main analysis method. Extracts and returns all settings from the 3MF file."""
         logger.debug("Starting analysis of file: %s", self.filepath)
-        try:
-            self._extract()
-            self._parse_project_settings()
-            self._parse_model_settings()
-            result = self._build_result()
-            logger.debug("Successfully analyzed %d objects", len(self.objects))
-            return result
-        finally:
-            self._cleanup()
+        # Use TemporaryDirectory context manager for robust cleanup
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.temp_dir = Path(temp_dir)
+            try:
+                self._extract()
+                self._parse_project_settings()
+                self._parse_model_settings()
+                result = self._build_result()
+                logger.debug("Successfully analyzed %d objects", len(self.objects))
+                return result
+            except Exception:
+                # Context manager handles directory cleanup
+                raise
 
     def _extract(self):
         """Extract 3MF archive with Zip Slip protection.
 
         Validates all paths in the archive to prevent path traversal attacks.
-        Uses a temporary directory that will be cleaned up in _cleanup().
+        Uses a temporary directory managed by the caller.
 
         Raises:
             ValueError: If archive contains unsafe paths (Zip Slip attack).
             zipfile.BadZipFile: If the file is not a valid ZIP archive.
             OSError: If extraction fails due to filesystem issues.
         """
-        self.temp_dir = Path(tempfile.mkdtemp())
+        if not self.temp_dir:
+            raise RuntimeError("Temporary directory not initialized")
+
         try:
             with zipfile.ZipFile(self.filepath, 'r') as z:
                 # Zip Slip protection: validate all paths before extraction
@@ -97,31 +103,14 @@ class ThreeMFAnalyzer:
                         raise ValueError(f"Path traversal detected in archive: {member}")
                 z.extractall(self.temp_dir)
         except zipfile.BadZipFile as e:
-            self._cleanup_on_error()
             raise zipfile.BadZipFile(f"Invalid or corrupted 3MF file: {self.filepath}") from e
-        except ValueError:
-            # Re-raise security-related errors without wrapping
-            self._cleanup_on_error()
-            raise
         except OSError as e:
-            self._cleanup_on_error()
             raise OSError(f"Failed to extract 3MF archive '{self.filepath}': {e}") from e
         except Exception as e:
-            self._cleanup_on_error()
+            if isinstance(e, ValueError): 
+                raise # Re-raise security errors as-is
             logger.error("Unexpected error extracting '%s': %s", self.filepath, e)
             raise
-
-    def _cleanup_on_error(self):
-        """Cleanup temp directory on extraction error."""
-        if self.temp_dir and self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir, ignore_errors=True)
-        self.temp_dir = None
-
-    def _cleanup(self):
-        """Cleanup temporary files."""
-        if self.temp_dir and self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
-        self.temp_dir = None
 
     def _parse_project_settings(self):
         """Parse project_settings.config (JSON).

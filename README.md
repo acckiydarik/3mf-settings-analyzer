@@ -389,8 +389,6 @@ The analyzer parses:
 3mf-settings-analyzer/
 ├── 3mf_analyzer.py             # Thin entry point (calls core.cli.main)
 ├── pyproject.toml              # Package metadata, dependencies, CLI entry point
-├── requirements.txt            # Python dependencies
-├── requirements-dev.txt        # Dev dependencies (pytest, coverage)
 ├── core/                       # Core package
 │   ├── __init__.py                 # Public API exports
 │   ├── _version.py                 # Single source of truth for __version__
