@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -357,16 +358,36 @@ def _build_settings_data() -> dict:
 
 
 def generate_json() -> Path:
-    """Parse .cpp files and write settings_wiki.json.
+    """Parse .cpp files and write settings_wiki.json (thread-safe).
+    
+    Acquires cache lock to ensure atomic file write and cache invalidation.
 
     Returns:
         Path to the generated JSON file.
     """
     data = _build_settings_data()
 
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(_JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    # Acquire lock to ensure atomic file write + cache invalidation
+    with _cache_lock:
+        _DATA_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Atomic write: write to temp file then rename
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            encoding='utf-8',
+            dir=_DATA_DIR,
+            delete=False,
+            suffix='.tmp'
+        ) as tmp:
+            json.dump(data, tmp, indent=2, ensure_ascii=False)
+            tmp_path = Path(tmp.name)
+        
+        # Atomic rename (replaces existing file)
+        tmp_path.replace(_JSON_PATH)
+        
+        # Invalidate cache so next _load_cache() reads new file
+        global _cache
+        _cache = None
 
     meta = data["_meta"]
     logger.debug(
@@ -536,11 +557,28 @@ _cache: Optional[dict] = None
 _cache_lock = threading.Lock()
 
 
+def _invalidate_cache() -> None:
+    """Invalidate the cache, forcing reload on next access (thread-safe).
+    
+    Should be called after updating settings_wiki.json to ensure
+    all threads see the new data.
+    """
+    global _cache
+    with _cache_lock:
+        _cache = None
+        logger.debug("Cache invalidated")
+
+
 def _load_cache() -> dict:
-    """Load and cache settings_wiki.json (thread-safe)."""
+    """Load and cache settings_wiki.json (thread-safe).
+    
+    Uses double-checked locking pattern for thread-safe lazy initialization.
+    Returns a reference to the cached dict - callers should NOT modify it.
+    """
     global _cache
     
-    # Fast path: cache already loaded (no lock needed)
+    # Fast path: cache already loaded (no lock needed for read)
+    # This is safe because we never mutate _cache, only replace it
     if _cache is not None:
         return _cache
     

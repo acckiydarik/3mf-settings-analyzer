@@ -33,7 +33,15 @@ def _is_custom(obj_val: Any, global_val: Any) -> bool:
     """Check if object value differs from global profile value."""
     if obj_val is None:
         return False
-    return str(obj_val) != str(global_val)
+    
+    # Try numeric comparison first to handle 1.0 vs "1.0" correctly
+    try:
+        obj_num = float(obj_val)
+        global_num = float(global_val)
+        return obj_num != global_num
+    except (ValueError, TypeError):
+        # Fall back to string comparison for non-numeric values
+        return str(obj_val) != str(global_val)
 
 
 class ThreeMFAnalyzer:
@@ -49,8 +57,8 @@ class ThreeMFAnalyzer:
     def analyze(self) -> Dict[str, Any]:
         """Main analysis method. Extracts and returns all settings from the 3MF file."""
         logger.debug("Starting analysis of file: %s", self.filepath)
-        self._extract()
         try:
+            self._extract()
             self._parse_project_settings()
             self._parse_model_settings()
             result = self._build_result()
@@ -75,8 +83,12 @@ class ThreeMFAnalyzer:
             with zipfile.ZipFile(self.filepath, 'r') as z:
                 # Zip Slip protection: validate all paths before extraction
                 for member in z.namelist():
+                    # Check for absolute paths (leading slash/backslash) before creating Path
+                    # Note: Path.is_absolute() behaves differently on Windows vs Unix
+                    if member.startswith(('/', '\\')):
+                        raise ValueError(f"Unsafe absolute path in archive: {member}")
                     member_path = Path(member)
-                    # Check for absolute paths or path traversal
+                    # Check for OS-specific absolute paths (e.g., C:\ on Windows)
                     if member_path.is_absolute():
                         raise ValueError(f"Unsafe absolute path in archive: {member}")
                     # Resolve and check if path stays within temp_dir
@@ -304,7 +316,8 @@ class ThreeMFAnalyzer:
         custom = {}
 
         diff_settings = self.project_settings.get('different_settings_to_system', [])
-        if diff_settings and diff_settings[0]:
+        # Validate that diff_settings is a non-empty list before accessing first element
+        if isinstance(diff_settings, list) and len(diff_settings) > 0 and diff_settings[0]:
             # Filter empty strings that result from split on empty or ";;"
             keys = [k.strip() for k in diff_settings[0].split(';') if k.strip()]
             for key in keys:
@@ -343,10 +356,128 @@ class ThreeMFAnalyzer:
             return ''
         return str(value).replace('%', '')
 
-    def _build_result(self) -> Dict[str, Any]:
-        """Build the result."""
-        profile = self._get_profile_info()
+    def _build_object_row(
+        self, 
+        obj: Dict[str, Any], 
+        obj_id: str, 
+        plate_num: int, 
+        profile: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Build a row for a single object.
+        
+        Args:
+            obj: Object data dictionary
+            obj_id: Object ID
+            plate_num: Plate number
+            profile: Global profile settings
+            
+        Returns:
+            Dictionary representing the object row
+        """
+        obj_name = obj.get('name', f'Object {obj_id}')
+        
+        obj_layer = obj.get('layer_height') or profile['layer_height']
+        obj_walls = obj.get('wall_loops') or profile['wall_loops']
+        obj_infill = obj.get('sparse_infill_density') or profile['sparse_infill_density']
+        obj_support = obj.get('enable_support') or profile['enable_support']
+        obj_brim = obj.get('brim_type') or profile['brim_type']
+        obj_speed = obj.get('outer_wall_speed') or profile['outer_wall_speed']
+        obj_extruder = obj.get('extruder', DEFAULT_EXTRUDER)
+        
+        return {
+            'plate': plate_num,
+            'name': obj_name,
+            'is_parent': True,
+            'is_part': False,
+            'filament': obj_extruder,
+            'layer_height': obj_layer,
+            'layer_custom': _is_custom(obj.get('layer_height'), profile['layer_height']),
+            'wall_loops': obj_walls,
+            'walls_custom': _is_custom(obj.get('wall_loops'), profile['wall_loops']),
+            'infill': self._format_infill(obj_infill),
+            'infill_custom': _is_custom(obj.get('sparse_infill_density'), profile['sparse_infill_density']),
+            'support': 'On' if obj_support == BOOL_TRUE else 'Off',
+            'support_custom': _is_custom(obj.get('enable_support'), profile['enable_support']),
+            'brim': self._format_brim(obj_brim),
+            'brim_custom': _is_custom(obj.get('brim_type'), profile['brim_type']),
+            'outer_wall_speed': obj_speed,
+            'speed_custom': _is_custom(obj.get('outer_wall_speed'), profile['outer_wall_speed']),
+            'custom_settings': obj.get('custom_settings', {}),
+            # Store values for part inheritance
+            '_obj_infill': obj_infill,
+            '_obj_walls': obj_walls,
+            '_obj_speed': obj_speed,
+            '_obj_support': obj_support,
+            '_obj_extruder': obj_extruder,
+        }
 
+    def _build_part_row(
+        self, 
+        part: Dict[str, Any], 
+        parent_row: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Build a row for a part (inherits values from parent object).
+        
+        Args:
+            part: Part data dictionary
+            parent_row: Parent object row (contains inherited values)
+            
+        Returns:
+            Dictionary representing the part row
+        """
+        part_name = part.get('name', 'Part')
+        part_custom = part.get('custom_settings', {})
+        
+        # Inherit from parent object
+        obj_infill = parent_row['_obj_infill']
+        obj_walls = parent_row['_obj_walls']
+        obj_speed = parent_row['_obj_speed']
+        obj_support = parent_row['_obj_support']
+        obj_extruder = parent_row['_obj_extruder']
+        
+        part_extruder = part.get('extruder') or obj_extruder
+        
+        # Check for part-specific overrides (use part's custom value or inherit from parent)
+        part_infill = (
+            part_custom.get('sparse_infill_density')
+            or part_custom.get('skeleton_infill_density')
+            or obj_infill
+        )
+        part_infill_custom = any(k in part_custom for k in INFILL_DENSITY_KEYS)
+        
+        part_walls = part_custom.get('wall_loops') or obj_walls
+        part_walls_custom = 'wall_loops' in part_custom
+        
+        part_speed = part_custom.get('outer_wall_speed') or obj_speed
+        part_speed_custom = 'outer_wall_speed' in part_custom
+        
+        # Inherit support from parent
+        part_support = 'On' if obj_support == BOOL_TRUE else 'Off'
+        
+        return {
+            'plate': '',
+            'name': f"  {part_name}",
+            'is_parent': False,
+            'is_part': True,
+            'filament': part_extruder,
+            'layer_height': '',
+            'layer_custom': False,
+            'wall_loops': part_walls,
+            'walls_custom': part_walls_custom,
+            'infill': self._format_infill(part_infill),
+            'infill_custom': part_infill_custom,
+            'support': part_support,
+            'support_custom': False,
+            'brim': '',
+            'brim_custom': False,
+            'outer_wall_speed': part_speed,
+            'speed_custom': part_speed_custom,
+            'custom_settings': part_custom,
+        }
+
+    def _build_result(self) -> Dict[str, Any]:
+        """Build the result by aggregating all objects and parts from all plates."""
+        profile = self._get_profile_info()
         rows = []
 
         for plate in self.plates:
@@ -355,84 +486,28 @@ class ThreeMFAnalyzer:
             for obj_id in plate['objects']:
                 obj = self.objects.get(obj_id, {})
                 obj_name = obj.get('name', f'Object {obj_id}')
+                
+                # Build object row
+                obj_row = self._build_object_row(obj, obj_id, plate_num, profile)
+                rows.append(obj_row)
 
-                obj_layer = obj.get('layer_height') or profile['layer_height']
-                obj_walls = obj.get('wall_loops') or profile['wall_loops']
-                obj_infill = obj.get('sparse_infill_density') or profile['sparse_infill_density']
-                obj_support = obj.get('enable_support') or profile['enable_support']
-                obj_brim = obj.get('brim_type') or profile['brim_type']
-                obj_speed = obj.get('outer_wall_speed') or profile['outer_wall_speed']
-                obj_extruder = obj.get('extruder', DEFAULT_EXTRUDER)
-
-                rows.append({
-                    'plate': plate_num,
-                    'name': obj_name,
-                    'is_parent': True,
-                    'is_part': False,
-                    'filament': obj_extruder,
-                    'layer_height': obj_layer,
-                    'layer_custom': _is_custom(obj.get('layer_height'), profile['layer_height']),
-                    'wall_loops': obj_walls,
-                    'walls_custom': _is_custom(obj.get('wall_loops'), profile['wall_loops']),
-                    'infill': self._format_infill(obj_infill),
-                    'infill_custom': _is_custom(obj.get('sparse_infill_density'), profile['sparse_infill_density']),
-                    'support': 'On' if obj_support == BOOL_TRUE else 'Off',
-                    'support_custom': _is_custom(obj.get('enable_support'), profile['enable_support']),
-                    'brim': self._format_brim(obj_brim),
-                    'brim_custom': _is_custom(obj.get('brim_type'), profile['brim_type']),
-                    'outer_wall_speed': obj_speed,
-                    'speed_custom': _is_custom(obj.get('outer_wall_speed'), profile['outer_wall_speed']),
-                    'custom_settings': obj.get('custom_settings', {}),
-                })
-
-                # Parts (inherit values from parent object like slicer does)
+                # Process parts (inherit values from parent object like slicer does)
                 # Skip parts if there's only one part with the same name as the object
                 parts = obj.get('parts', [])
                 if len(parts) == 1 and parts[0].get('name', 'Part') == obj_name:
                     continue  # Don't duplicate single part with same name as object
 
                 for part in parts:
-                    part_name = part.get('name', 'Part')
-                    part_extruder = part.get('extruder') or obj_extruder
-                    part_custom = part.get('custom_settings', {})
+                    part_row = self._build_part_row(part, obj_row)
+                    rows.append(part_row)
 
-                    # Check for part-specific overrides (use part's custom value or inherit from parent)
-                    part_infill = (
-                        part_custom.get('sparse_infill_density')
-                        or part_custom.get('skeleton_infill_density')
-                        or obj_infill
-                    )
-                    part_infill_custom = any(k in part_custom for k in INFILL_DENSITY_KEYS)
-
-                    part_walls = part_custom.get('wall_loops') or obj_walls
-                    part_walls_custom = 'wall_loops' in part_custom
-
-                    part_speed = part_custom.get('outer_wall_speed') or obj_speed
-                    part_speed_custom = 'outer_wall_speed' in part_custom
-
-                    # Inherit support from parent
-                    part_support = 'On' if obj_support == BOOL_TRUE else 'Off'
-
-                    rows.append({
-                        'plate': '',
-                        'name': f"  {part_name}",
-                        'is_parent': False,
-                        'is_part': True,
-                        'filament': part_extruder,
-                        'layer_height': '',
-                        'layer_custom': False,
-                        'wall_loops': part_walls,
-                        'walls_custom': part_walls_custom,
-                        'infill': self._format_infill(part_infill),
-                        'infill_custom': part_infill_custom,
-                        'support': part_support,
-                        'support_custom': False,
-                        'brim': '',
-                        'brim_custom': False,
-                        'outer_wall_speed': part_speed,
-                        'speed_custom': part_speed_custom,
-                        'custom_settings': part_custom,
-                    })
+        # Clean up internal fields used for inheritance
+        for row in rows:
+            row.pop('_obj_infill', None)
+            row.pop('_obj_walls', None)
+            row.pop('_obj_speed', None)
+            row.pop('_obj_support', None)
+            row.pop('_obj_extruder', None)
 
         return {
             'file': str(self.filepath.name),

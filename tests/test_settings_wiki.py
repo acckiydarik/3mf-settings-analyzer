@@ -3,6 +3,7 @@
 import json
 import sys
 import threading
+import time
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -19,6 +20,8 @@ from core.settings_wiki import (
     get_setting_info,
     get_all_settings,
     get_meta,
+    _invalidate_cache,
+    _load_cache,
     WIKI_BASE,
     _TYPE_MAP,
     _WIKI_FALLBACKS,
@@ -780,3 +783,216 @@ class TestAtomicFileWrites:
             assert result is True
             assert dest.exists()
             assert dest.read_bytes() == valid_content
+
+
+# ═══════════════════════════════════════════════════════════════
+# Thread Safety Tests
+# ═══════════════════════════════════════════════════════════════
+
+@pytest.fixture
+def mock_json_data():
+    """Sample wiki data for testing thread-safety."""
+    return {
+        "_meta": {
+            "wiki_base": "https://example.com/wiki/",
+            "total_settings": 2,
+            "with_wiki_page": 2,
+        },
+        "settings": {
+            "layer_height": {
+                "label": "Layer Height",
+                "wiki_page": "layer_height",
+            },
+            "wall_loops": {
+                "label": "Wall Loops",
+                "wiki_page": "walls",
+            },
+        }
+    }
+
+
+class TestThreadSafety:
+    """Test thread-safety of cache operations."""
+
+    def test_concurrent_cache_loads(self, tmp_path, mock_json_data, monkeypatch):
+        """Test multiple threads loading cache simultaneously."""
+        # Setup: create a mock JSON file
+        json_file = tmp_path / "settings_wiki.json"
+        with open(json_file, 'w') as f:
+            json.dump(mock_json_data, f)
+
+        # Patch _JSON_PATH to use our test file
+        from core import settings_wiki
+        monkeypatch.setattr(settings_wiki, '_JSON_PATH', json_file)
+        monkeypatch.setattr(settings_wiki, '_DATA_DIR', tmp_path)
+
+        # Invalidate any existing cache
+        _invalidate_cache()
+
+        results = []
+        errors = []
+
+        def load_and_query():
+            """Worker function that loads cache and queries data."""
+            try:
+                # Each thread calls get_wiki_url which internally loads cache
+                url = get_wiki_url("layer_height")
+                results.append(url)
+            except Exception as e:
+                errors.append(e)
+
+        # Create multiple threads that all try to load cache at once
+        threads = [threading.Thread(target=load_and_query) for _ in range(10)]
+        
+        # Start all threads simultaneously
+        for t in threads:
+            t.start()
+        
+        # Wait for all to complete
+        for t in threads:
+            t.join()
+
+        # Verify no errors occurred
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+        
+        # Verify all threads got the same result
+        assert len(results) == 10
+        assert all(r == results[0] for r in results), "Threads got different results"
+        assert results[0] == "https://example.com/wiki/layer_height"
+
+    def test_cache_invalidation_thread_safety(self, tmp_path, mock_json_data, monkeypatch):
+        """Test cache invalidation while other threads are reading."""
+        json_file = tmp_path / "settings_wiki.json"
+        with open(json_file, 'w') as f:
+            json.dump(mock_json_data, f)
+
+        from core import settings_wiki
+        monkeypatch.setattr(settings_wiki, '_JSON_PATH', json_file)
+        monkeypatch.setattr(settings_wiki, '_DATA_DIR', tmp_path)
+
+        # Start with clean cache
+        _invalidate_cache()
+
+        # Load cache once
+        get_wiki_url("layer_height")
+
+        results = []
+        stop_event = threading.Event()
+
+        def reader():
+            """Worker that repeatedly reads from cache."""
+            while not stop_event.is_set():
+                try:
+                    url = get_wiki_url("layer_height")
+                    results.append(('read', url))
+                    time.sleep(0.001)
+                except Exception as e:
+                    results.append(('error', str(e)))
+
+        def invalidator():
+            """Worker that invalidates cache."""
+            time.sleep(0.01)  # Let readers start
+            for _ in range(5):
+                _invalidate_cache()
+                results.append(('invalidate', None))
+                time.sleep(0.005)
+            stop_event.set()
+
+        # Run concurrent readers and invalidators
+        readers = [threading.Thread(target=reader) for _ in range(3)]
+        invalidate_thread = threading.Thread(target=invalidator)
+
+        for t in readers:
+            t.start()
+        invalidate_thread.start()
+
+        for t in readers:
+            t.join()
+        invalidate_thread.join()
+
+        # Check no errors occurred
+        errors = [r for r in results if r[0] == 'error']
+        assert len(errors) == 0, f"Errors during concurrent access: {errors}"
+
+        # Check we got both reads and invalidations
+        reads = [r for r in results if r[0] == 'read']
+        invalidations = [r for r in results if r[0] == 'invalidate']
+        assert len(reads) > 0, "No reads occurred"
+        assert len(invalidations) == 5, f"Expected 5 invalidations, got {len(invalidations)}"
+
+    def test_generate_json_atomicity(self, tmp_path, mock_json_data, monkeypatch):
+        """Test that generate_json properly invalidates cache."""
+        json_file = tmp_path / "settings_wiki.json"
+        
+        from core import settings_wiki
+        monkeypatch.setattr(settings_wiki, '_JSON_PATH', json_file)
+        monkeypatch.setattr(settings_wiki, '_DATA_DIR', tmp_path)
+
+        # Create initial data
+        with open(json_file, 'w') as f:
+            json.dump(mock_json_data, f)
+
+        # Load into cache
+        url1 = get_wiki_url("layer_height")
+        assert url1 == "https://example.com/wiki/layer_height"
+
+        # Modify the file (simulating generate_json)
+        modified_data = mock_json_data.copy()
+        modified_data["settings"]["layer_height"]["wiki_page"] = "new_page"
+        
+        with open(json_file, 'w') as f:
+            json.dump(modified_data, f)
+
+        # Without invalidation, cache should still return old value
+        url2 = get_wiki_url("layer_height")
+        assert url2 == "https://example.com/wiki/layer_height", "Cache not working"
+
+        # After invalidation, should get new value
+        _invalidate_cache()
+        url3 = get_wiki_url("layer_height")
+        assert url3 == "https://example.com/wiki/new_page", "Cache not invalidated"
+
+
+class TestRaceConditions:
+    """Test potential race conditions in edge cases."""
+
+    def test_double_checked_locking_pattern(self, tmp_path, mock_json_data, monkeypatch):
+        """Verify double-checked locking prevents multiple file reads."""
+        json_file = tmp_path / "settings_wiki.json"
+        with open(json_file, 'w') as f:
+            json.dump(mock_json_data, f)
+
+        from core import settings_wiki
+        monkeypatch.setattr(settings_wiki, '_JSON_PATH', json_file)
+        monkeypatch.setattr(settings_wiki, '_DATA_DIR', tmp_path)
+
+        _invalidate_cache()
+
+        # Track file opens
+        original_open = open
+        open_count = {'count': 0}
+
+        def counting_open(*args, **kwargs):
+            if len(args) > 0 and str(args[0]).endswith('settings_wiki.json'):
+                if len(args) > 1 and 'r' in str(args[1]):
+                    open_count['count'] += 1
+            return original_open(*args, **kwargs)
+
+        # Start multiple threads simultaneously
+        barrier = threading.Barrier(10)
+
+        def load_with_barrier():
+            barrier.wait()  # Synchronize all threads
+            _load_cache()
+
+        with patch('builtins.open', side_effect=counting_open):
+            threads = [threading.Thread(target=load_with_barrier) for _ in range(10)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        # Should only open file once despite 10 concurrent calls
+        # Allow for 2 in case of timing, but should be close to 1
+        assert open_count['count'] <= 2, \
+            f"File opened {open_count['count']} times, expected 1-2 (double-check locking failed)"

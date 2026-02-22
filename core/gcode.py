@@ -284,10 +284,12 @@ class GcodeAnalyzer:
 
         # Layer info
         try:
-            stats['total_layers'] = (
-                self.statistics.get('total_layers_count')
-                or int(self.header_info.get('total_layer_number', 0) or 0)
-            )
+            # Use 'is not None' check to properly handle 0 value
+            total_layers_count = self.statistics.get('total_layers_count')
+            if total_layers_count is not None:
+                stats['total_layers'] = total_layers_count
+            else:
+                stats['total_layers'] = int(self.header_info.get('total_layer_number', 0) or 0)
         except (ValueError, TypeError):
             stats['total_layers'] = 0
         try:
