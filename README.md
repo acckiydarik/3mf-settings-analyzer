@@ -366,6 +366,9 @@ Gcode files are plain-text machine instruction files. OrcaSlicer-compatible slic
 ; HEADER_BLOCK_START          <- slicer info, layer count, max height
 ; HEADER_BLOCK_END
 
+; thumbnail begin              <- base64-encoded preview images (skipped)
+; thumbnail end
+
 ; printing object NAME id:XX  <- object markers (throughout file)
 ; stop printing object NAME
 
@@ -377,11 +380,15 @@ Gcode files are plain-text machine instruction files. OrcaSlicer-compatible slic
 ; CONFIG_BLOCK_END
 ```
 
-The analyzer parses:
-1. **Header** (first 100 lines) for slicer version and basic info
-2. **Object markers** (full file scan) for printed object names
-3. **Statistics** (last 100KB) for filament usage, time, and layer counts
-4. **CONFIG_BLOCK** (last 100KB) for all slicer settings
+The analyzer uses a **single-pass section-aware parser** that:
+1. **Detects sections** using block markers (`HEADER`, `THUMBNAIL`, `EXECUTABLE`, `CONFIG`)
+2. **Skips thumbnails** (base64-encoded images) to save processing time
+3. **Extracts object names** from `; printing object` markers during execution
+4. **Collects statistics** from comment lines before CONFIG_BLOCK
+5. **Parses settings** from CONFIG_BLOCK section
+6. **Stops at** `CONFIG_BLOCK_END` (no need to read rest of file)
+
+This approach is **efficient** (single pass), **safe** (max line length check), and **extensible** (easy to add new sections via `GCODE_PARSE_CONFIG`).
 
 ## Project Structure
 

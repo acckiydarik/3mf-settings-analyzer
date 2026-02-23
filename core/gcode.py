@@ -11,7 +11,11 @@ from core.constants import (
     GCODE_CONFIG_START,
     GCODE_HEADER_END,
     GCODE_OBJECT_MARKER,
+    GCODE_PARSE_CONFIG,
+    GCODE_THUMBNAIL_END,
+    GCODE_THUMBNAIL_START,
     HEADER_LINES_LIMIT,
+    MAX_GCODE_LINE_LENGTH,
     TAIL_READ_SIZE,
     build_common_profile,
 )
@@ -53,120 +57,120 @@ class GcodeAnalyzer:
         return result
 
     def _parse_gcode(self):
-        """Parse gcode file using block markers for efficient parsing."""
+        """Parse gcode file in a single pass with section-aware processing.
+        
+        Optimized approach:
+        - Single pass through the file (vs 3 passes in old implementation)
+        - Skip thumbnail sections (base64-encoded images)
+        - Process only relevant sections based on GCODE_PARSE_CONFIG
+        - Add safety check for malformed files (line length limit)
+        """
         file_size = os.path.getsize(self.filepath)
-
-        # Read file in chunks from the end to find CONFIG_BLOCK
-        # Most gcode files have settings at the end
+        config = GCODE_PARSE_CONFIG
+        
+        # Section tracking
+        current_section = None
+        in_thumbnail = False
+        in_config = False
+        line_count = 0
+        statistics_lines = []  # Collect statistics lines before CONFIG_BLOCK
+        
         with open(self.filepath, 'r', encoding='utf-8', errors='replace') as f:
-            # First, read header (first HEADER_LINES_LIMIT lines)
-            header_lines = []
-            for i, line in enumerate(f):
-                if i >= HEADER_LINES_LIMIT:
-                    break
-                header_lines.append(line)
-                if line.strip() == GCODE_HEADER_END:
-                    break
-
-            self._parse_header(header_lines)
-
-            # Reset and scan for object markers (scan entire file for this)
-            f.seek(0)
             for line in f:
-                if line.startswith(GCODE_OBJECT_MARKER):
-                    self._extract_object_name(line)
-
-            # Now find and parse CONFIG_BLOCK from end of file
-            # Read last portion of file (settings are typically in last ~100KB)
-            f.seek(0, 2)  # Go to end
-            file_end = f.tell()
-            read_size = min(TAIL_READ_SIZE, file_end)
-            f.seek(max(0, file_end - read_size))
-
-            tail_content = f.read()
-            self._parse_config_block(tail_content)
-            self._parse_statistics(tail_content)
-
+                line_count += 1
+                
+                # Safety check for malformed files
+                if len(line) > MAX_GCODE_LINE_LENGTH:
+                    logger.warning(
+                        "Line %d exceeds maximum length (%d bytes), stopping parse for safety",
+                        line_count, MAX_GCODE_LINE_LENGTH
+                    )
+                    break
+                
+                # === SECTION DETECTION ===
+                stripped = line.strip()
+                
+                # Thumbnail section markers
+                if GCODE_THUMBNAIL_START in line:
+                    in_thumbnail = True
+                    continue
+                if GCODE_THUMBNAIL_END in line:
+                    in_thumbnail = False
+                    continue
+                
+                # CONFIG_BLOCK markers
+                if stripped == GCODE_CONFIG_START:
+                    in_config = True
+                    continue
+                if stripped == GCODE_CONFIG_END:
+                    # Finished parsing - no need to read rest of file
+                    break
+                
+                # === SKIP UNWANTED SECTIONS ===
+                if in_thumbnail and config['skip_thumbnails']:
+                    continue  # Skip base64 thumbnail data
+                
+                # === PROCESS BY SECTION ===
+                
+                # CONFIG_BLOCK section
+                if in_config and config['parse_config']:
+                    if stripped.startswith('; ') and ' = ' in stripped:
+                        setting_line = stripped[2:]  # Remove "; "
+                        key, _, value = setting_line.partition(' = ')
+                        self.settings[key.strip()] = value.strip()
+                    continue
+                
+                # Header and executable sections (everything before CONFIG_BLOCK)
+                if not in_config and stripped.startswith(';'):
+                    content = stripped[1:].strip()
+                    
+                    # Header metadata (first ~100 lines)
+                    if line_count <= HEADER_LINES_LIMIT and config['parse_headers']:
+                        self._parse_header_line(content)
+                    
+                    # Object markers (throughout executable section)
+                    if config['extract_objects'] and stripped.startswith(GCODE_OBJECT_MARKER):
+                        self._extract_object_name(stripped)
+                    
+                    # Statistics lines (appear before CONFIG_BLOCK)
+                    if config['parse_statistics']:
+                        # Collect lines that might be statistics
+                        if any(marker in content for marker in [
+                            'filament used', 'filament cost', 'estimated printing time',
+                            'total layers count', 'filament change'
+                        ]):
+                            statistics_lines.append(stripped)
+        
+        # Parse collected statistics
+        if config['parse_statistics'] and statistics_lines:
+            self._parse_statistics_lines(statistics_lines)
+        
         # Add file size to statistics
         self.statistics['file_size_bytes'] = file_size
+        logger.debug("Parsed %d lines from gcode file", line_count)
 
-    def _parse_header(self, lines: List[str]):
-        """Parse header block for basic info.
+    def _parse_header_line(self, content: str):
+        """Parse a single header line."""
+        # Parse "generated by" line
+        if content.startswith('generated by '):
+            match = re.match(
+                r'generated by (.+?) (\d+\.\d+\.\d+) on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}:\d{2})',
+                content
+            )
+            if match:
+                self.header_info['slicer'] = match.group(1)
+                self.header_info['slicer_version'] = match.group(2)
+                self.header_info['generated_date'] = f"{match.group(3)} {match.group(4)}"
+        
+        # Parse key: value pairs in header
+        elif ':' in content and '=' not in content:
+            key, _, value = content.partition(':')
+            key = key.strip().lower().replace(' ', '_')
+            value = value.strip()
+            self.header_info[key] = value
 
-        Header format:
-        ; generated by Snapmaker Orca 2.2.1 on 2026-01-30 at 12:34:13
-        ; total layer number: 138
-        ; max_z_height: 22.12
-        """
-        for line in lines:
-            line = line.strip()
-            if not line.startswith(';'):
-                continue
-
-            content = line[1:].strip()
-
-            # Parse "generated by" line
-            if content.startswith('generated by '):
-                match = re.match(
-                    r'generated by (.+?) (\d+\.\d+\.\d+) on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}:\d{2})',
-                    content
-                )
-                if match:
-                    self.header_info['slicer'] = match.group(1)
-                    self.header_info['slicer_version'] = match.group(2)
-                    self.header_info['generated_date'] = f"{match.group(3)} {match.group(4)}"
-
-            # Parse key: value pairs in header
-            elif ':' in content and '=' not in content:
-                key, _, value = content.partition(':')
-                key = key.strip().lower().replace(' ', '_')
-                value = value.strip()
-                self.header_info[key] = value
-
-    def _extract_object_name(self, line: str):
-        """Extract object name from '; printing object NAME id:XXX' marker."""
-        # Format: ; printing object NAME id:123456 copy N
-        content = line[len(GCODE_OBJECT_MARKER):].strip()
-        # Remove id:xxx and copy N parts
-        match = re.match(r'(.+?)\s+id:\d+', content)
-        if match:
-            obj_name = match.group(1).strip()
-            self.object_names.add(obj_name)
-
-    def _parse_config_block(self, content: str):
-        """Parse CONFIG_BLOCK section for all settings.
-
-        Settings format:
-        ; setting_key = value
-        """
-        in_config = False
-
-        for line in content.split('\n'):
-            line = line.strip()
-
-            if line == GCODE_CONFIG_START:
-                in_config = True
-                continue
-            elif line == GCODE_CONFIG_END:
-                break
-
-            if in_config and line.startswith('; ') and ' = ' in line:
-                # Parse setting line: ; key = value
-                setting_line = line[2:]  # Remove "; "
-                key, _, value = setting_line.partition(' = ')
-                key = key.strip()
-                value = value.strip()
-                self.settings[key] = value
-
-    def _parse_statistics(self, content: str):
-        """Parse statistics from gcode (before CONFIG_BLOCK).
-
-        Statistics format:
-        ; filament used [g] = 10.08, 0.87, 0.31
-        ; total filament used [g] = 11.26
-        ; estimated printing time (normal mode) = 1h 11m 17s
-        """
-        # Statistics patterns (these appear before CONFIG_BLOCK)
+    def _parse_statistics_lines(self, lines: List[str]):
+        """Parse statistics from collected comment lines."""
         patterns = {
             'filament_used_g': r'^; filament used \[g\] = (.+)$',
             'filament_used_mm': r'^; filament used \[mm\] = (.+)$',
@@ -179,9 +183,8 @@ class GcodeAnalyzer:
             'estimated_time': r'^; estimated printing time \(normal mode\) = (.+)$',
             'estimated_first_layer_time': r'^; estimated first layer printing time \(normal mode\) = (.+)$',
         }
-
-        for line in content.split('\n'):
-            line = line.strip()
+        
+        for line in lines:
             for key, pattern in patterns.items():
                 match = re.match(pattern, line)
                 if match:
@@ -207,6 +210,16 @@ class GcodeAnalyzer:
                     else:
                         self.statistics[key] = value
                     break
+
+    def _extract_object_name(self, line: str):
+        """Extract object name from '; printing object NAME id:XXX' marker."""
+        # Format: ; printing object NAME id:123456 copy N
+        content = line[len(GCODE_OBJECT_MARKER):].strip()
+        # Remove id:xxx and copy N parts
+        match = re.match(r'(.+?)\s+id:\d+', content)
+        if match:
+            obj_name = match.group(1).strip()
+            self.object_names.add(obj_name)
 
     def _get_value(self, key: str, default: Any = None) -> Any:
         """Get value from settings, handling list formats.

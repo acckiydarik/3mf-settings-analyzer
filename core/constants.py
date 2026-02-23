@@ -53,6 +53,21 @@ GCODE_HEADER_END = '; HEADER_BLOCK_END'
 GCODE_CONFIG_START = '; CONFIG_BLOCK_START'
 GCODE_CONFIG_END = '; CONFIG_BLOCK_END'
 GCODE_OBJECT_MARKER = '; printing object '
+GCODE_THUMBNAIL_START = '; thumbnail begin'
+GCODE_THUMBNAIL_END = '; thumbnail end'
+
+# Gcode parsing configuration - what sections to process
+GCODE_PARSE_CONFIG = {
+    'parse_headers': True,           # Parse header metadata (slicer version, etc.)
+    'skip_thumbnails': True,         # Skip base64-encoded preview images
+    'extract_objects': True,         # Extract object names from markers
+    'skip_gcode_commands': True,     # Skip G-code movement commands (future: 3D preview)
+    'parse_statistics': True,        # Parse statistics (filament usage, time, etc.)
+    'parse_config': True,            # Parse CONFIG_BLOCK settings
+}
+
+# Max line length for safety (malformed files protection)
+MAX_GCODE_LINE_LENGTH = 10_000  # G-code commands are typically < 200 chars
 
 # Common profile setting keys shared by ThreeMFAnalyzer and GcodeAnalyzer.
 # Each tuple is (output_key, source_key) -- both analyzers read from the same
