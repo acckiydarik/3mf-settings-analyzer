@@ -325,11 +325,11 @@ class TestWikiFallbacks:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Test thread safety
+# Test cache recovery and error handling
 # ═══════════════════════════════════════════════════════════════
 
-class TestThreadSafety:
-    """Tests for thread-safe cache loading."""
+class TestCacheRecovery:
+    """Tests for cache error handling and recovery."""
 
     def test_concurrent_load_cache_is_safe(self):
         """Multiple threads loading cache should not cause issues."""
@@ -361,6 +361,27 @@ class TestThreadSafety:
         assert len(errors) == 0
         # All results should be dictionaries
         assert all(isinstance(r, dict) for r in results)
+
+    def test_load_cache_corrupted_json(self, tmp_path, monkeypatch):
+        """Test graceful handling of corrupted settings_wiki.json."""
+        # Create corrupted JSON file
+        corrupted_file = tmp_path / "settings_wiki.json"
+        corrupted_file.write_text("{invalid json content that cannot be parsed")
+        
+        # Patch paths to use our test file
+        from core import settings_wiki
+        monkeypatch.setattr(settings_wiki, '_JSON_PATH', corrupted_file)
+        monkeypatch.setattr(settings_wiki, '_DATA_DIR', tmp_path)
+        
+        # Invalidate cache to force reload
+        _invalidate_cache()
+        
+        # Should not crash, return empty cache instead
+        cache = _load_cache()
+        
+        assert cache == {"_meta": {}, "settings": {}}
+        assert get_wiki_url("any_setting") is None
+        assert get_all_settings() == {}
 
 
 # ═══════════════════════════════════════════════════════════════
