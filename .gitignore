@@ -71,9 +71,15 @@ venv.bak/
 
 # 3MF files (test data)
 *.3mf
+.gcode
 
 # OrcaSlicer source files (AGPL-3.0, downloaded on demand)
 core/data/*.cpp
 
 # Local development notes
 DEVELOPMENT.md
+
+# temp files
+*.tmp
+/tmp/
+/temp/
