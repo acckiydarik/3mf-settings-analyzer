@@ -77,10 +77,7 @@ _SOURCES = {
 }
 
 def _get_data_dir() -> Path:
-    """Get data directory, supporting PyInstaller frozen executables."""
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        # Running as PyInstaller bundle
-        return Path(sys._MEIPASS) / "data"
+    """Get data directory."""
     return Path(__file__).resolve().parent / "data"
 
 _DATA_DIR = _get_data_dir()
