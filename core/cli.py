@@ -204,6 +204,7 @@ Examples:
         from core.settings_wiki import update as wiki_update
         console = Console(no_color=args.no_color)
         console.print("[cyan]Updating wiki data from OrcaSlicer GitHub...[/cyan]")
+        wiki_ok = True
         try:
             updated = wiki_update(force=args.force_update_wiki)
             if updated:
@@ -213,10 +214,9 @@ Examples:
         except Exception as e:
             logger.error("Failed to update wiki data: %s", e)
             console.print(f"[red]Failed to update wiki data: {e}[/red]")
-            if not args.files:
-                sys.exit(1)
+            wiki_ok = False
         if not args.files:
-            sys.exit(0)
+            sys.exit(0 if wiki_ok else 1)
 
     if not args.files:
         parser.error("the following arguments are required: files")
