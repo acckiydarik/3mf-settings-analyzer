@@ -325,6 +325,15 @@ class ThreeMFAnalyzer:
         profile['process'] = self.project_settings.get('print_settings_id', 'Unknown')
         profile['filaments'] = self.project_settings.get('filament_settings_id', ['Unknown'])
         profile['initial_layer_print_height'] = self._get_value('initial_layer_print_height', '')
+        # Support both legacy and current first-layer temperature keys.
+        profile['first_layer_nozzle_temperature'] = (
+            self._get_value('nozzle_temperature_initial_layer', '')
+            or self._get_value('first_layer_temperature', '')
+        )
+        profile['first_layer_bed_temperature'] = (
+            self._get_value('hot_plate_temp_initial_layer', '')
+            or self._get_value('first_layer_bed_temperature', '')
+        )
         return profile
 
     def _format_brim(self, brim_type: str) -> str:

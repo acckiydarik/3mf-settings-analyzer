@@ -124,9 +124,16 @@ COMMON_PROFILE_KEYS: tuple = (
     ('timelapse_type', 'timelapse_type'),
     # Supports
     ('support_type', 'support_type'),
+    ('support_threshold_angle', 'support_threshold_angle'),
+    ('support_top_z_distance', 'support_top_z_distance'),
+    ('support_bottom_z_distance', 'support_bottom_z_distance'),
     # Temperatures
+    ('first_layer_nozzle_temperature', 'nozzle_temperature_initial_layer'),
+    ('first_layer_bed_temperature', 'hot_plate_temp_initial_layer'),
     ('nozzle_temperature', 'nozzle_temperature'),
     ('bed_temperature', 'hot_plate_temp'),
+    # Flow limits
+    ('filament_max_volumetric_speed', 'filament_max_volumetric_speed'),
 )
 
 

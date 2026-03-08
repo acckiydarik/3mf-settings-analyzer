@@ -280,6 +280,15 @@ class GcodeAnalyzer:
         profile['filaments'] = self._get_list_value('filament_settings_id', ['Unknown'])
         # Gcode uses 'first_layer_height' instead of 'initial_layer_print_height'
         profile['initial_layer_print_height'] = self._get_value('first_layer_height', '')
+        # Support both legacy and current first-layer temperature keys.
+        profile['first_layer_nozzle_temperature'] = (
+            self._get_value('nozzle_temperature_initial_layer', '')
+            or self._get_value('first_layer_temperature', '')
+        )
+        profile['first_layer_bed_temperature'] = (
+            self._get_value('hot_plate_temp_initial_layer', '')
+            or self._get_value('first_layer_bed_temperature', '')
+        )
         return profile
 
     def _build_statistics(self) -> Dict[str, Any]:

@@ -66,6 +66,22 @@ def _fmt_speed(key: str) -> Callable[[Dict], str]:
     return _fmt
 
 
+def _fmt_degrees(key: str) -> Callable[[Dict], str]:
+    """Value + degree symbol."""
+    def _fmt(p: Dict) -> str:
+        v = p.get(key, '')
+        return f"{v}\u00b0" if v else ""
+    return _fmt
+
+
+def _fmt_volumetric_speed(key: str) -> Callable[[Dict], str]:
+    """Value + volumetric speed unit."""
+    def _fmt(p: Dict) -> str:
+        v = p.get(key, '')
+        return f"{v} mm\u00b3/s" if v else ""
+    return _fmt
+
+
 def _fmt_temp(key: str) -> Callable[[Dict], str]:
     """Red-styled value + degree C."""
     def _fmt(p: Dict) -> str:
@@ -221,6 +237,13 @@ GLOBAL_SETTINGS_FIELDS: List[Optional[FieldDef]] = [
     ("Top/Bottom Shell Layers", "top_shell_layers", _fmt_shell_layers, None),
     ("Brim Type", "brim_type", _fmt_plain('brim_type'), None),
     ("Enable Support", "enable_support", _fmt_support_toggle, None),
+    ("Support Type", "support_type", _fmt_plain('support_type'), _if_present('support_type')),
+    ("Support Threshold Angle", "support_threshold_angle",
+     _fmt_degrees('support_threshold_angle'), _if_present('support_threshold_angle')),
+    ("Support Top Z Distance", "support_top_z_distance",
+     _fmt_mm('support_top_z_distance'), _if_present('support_top_z_distance')),
+    ("Support Bottom Z Distance", "support_bottom_z_distance",
+     _fmt_mm('support_bottom_z_distance'), _if_present('support_bottom_z_distance')),
     ("Seam Position", "seam_position", _fmt_plain('seam_position'), None),
     # -- Speeds --
     None,
@@ -254,11 +277,20 @@ GLOBAL_SETTINGS_FIELDS: List[Optional[FieldDef]] = [
     ("Z-Hop", "z_hop", _fmt_mm('z_hop'), None),
     ("Pressure Advance", "pressure_advance",
      _fmt_plain('pressure_advance'), _if_present('pressure_advance')),
+    ("Max Volumetric Speed", "filament_max_volumetric_speed",
+     _fmt_volumetric_speed('filament_max_volumetric_speed'),
+     _if_present('filament_max_volumetric_speed')),
     ("Fan Min/Max Speed", "fan_min_speed", _fmt_fan, _cond_fan),
     ("Slow Down for Layer Cooling", "slow_down_for_layer_cooling",
      _fmt_cooling, _cond_cooling),
     # -- Temperatures --
     None,
+    ("First Layer Nozzle Temperature", "nozzle_temperature_initial_layer",
+     _fmt_temp('first_layer_nozzle_temperature'),
+     _if_present('first_layer_nozzle_temperature')),
+    ("First Layer Bed Temperature", "hot_plate_temp_initial_layer",
+     _fmt_temp('first_layer_bed_temperature'),
+     _if_present('first_layer_bed_temperature')),
     ("Nozzle Temperature", "nozzle_temperature",
      _fmt_temp('nozzle_temperature'), None),
     ("Bed Temperature", "bed_temperature",
