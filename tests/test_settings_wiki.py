@@ -491,6 +491,61 @@ class TestUpdate:
             # Should return True (content updated)
             assert result is True
 
+    def test_update_rejects_html_payload(self, tmp_path: Path, mock_urlopen):
+        """update() should reject HTML payloads and keep local files unchanged."""
+        old_content = b'// old content'
+        html_content = b'<!DOCTYPE html><html><body>Error</body></html>'
+        old_hash = '000000000000'  # Force mismatch path
+
+        json_path = tmp_path / 'settings_wiki.json'
+        json_path.write_text(json.dumps({
+            '_meta': {'sha': {'Tab.cpp': old_hash, 'PrintConfig.cpp': old_hash}},
+            'settings': {}
+        }))
+
+        tab_path = tmp_path / 'Tab.cpp'
+        cfg_path = tmp_path / 'PrintConfig.cpp'
+        tab_path.write_bytes(old_content)
+        cfg_path.write_bytes(old_content)
+
+        with patch('core.settings_wiki._DATA_DIR', tmp_path), \
+             patch('core.settings_wiki._JSON_PATH', json_path), \
+             patch('core.settings_wiki.urllib.request.urlopen') as mock_url, \
+             patch('core.settings_wiki.generate_json'):
+
+            mock_url.return_value = mock_urlopen(html_content)
+            result = update(force=False)
+
+            assert result is False
+            assert tab_path.read_bytes() == old_content
+            assert cfg_path.read_bytes() == old_content
+
+    def test_update_returns_false_when_atomic_write_fails(self, tmp_path: Path, mock_urlopen):
+        """update() should stop and return False when atomic write fails."""
+        old_content = b'// old content'
+        new_content = b'// new content'
+        old_hash = '000000000000'  # Force mismatch path
+
+        json_path = tmp_path / 'settings_wiki.json'
+        json_path.write_text(json.dumps({
+            '_meta': {'sha': {'Tab.cpp': old_hash, 'PrintConfig.cpp': old_hash}},
+            'settings': {}
+        }))
+
+        (tmp_path / 'Tab.cpp').write_bytes(old_content)
+        (tmp_path / 'PrintConfig.cpp').write_bytes(old_content)
+
+        with patch('core.settings_wiki._DATA_DIR', tmp_path), \
+             patch('core.settings_wiki._JSON_PATH', json_path), \
+             patch('core.settings_wiki.urllib.request.urlopen') as mock_url, \
+             patch('core.settings_wiki._write_bytes_atomic', return_value=False), \
+             patch('core.settings_wiki.generate_json'):
+
+            mock_url.return_value = mock_urlopen(new_content)
+            result = update(force=False)
+
+            assert result is False
+
 
 class TestDownloadFile:
     """Tests for _download_file function."""

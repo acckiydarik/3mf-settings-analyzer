@@ -412,6 +412,33 @@ def _get_github_sha(api_url: str) -> Optional[str]:
         return None
 
 
+def _is_html_payload(content: bytes) -> bool:
+    """Heuristic check for HTML payloads returned instead of source files."""
+    head = content.lstrip()[:256].lower()
+    return head.startswith(b'<!doctype') or head.startswith(b'<html')
+
+
+def _write_bytes_atomic(dest: Path, content: bytes) -> bool:
+    """Write bytes to disk atomically (temp file + replace)."""
+    tmp_path: Optional[Path] = None
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode='wb', dir=dest.parent, delete=False, suffix='.tmp'
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = Path(tmp.name)
+
+        # Atomic rename (on POSIX) / replace on Windows
+        tmp_path.replace(dest)
+        return True
+    except OSError as e:
+        logger.error("Failed to write file %s: %s", dest, e)
+        if tmp_path and tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        return False
+
+
 def _download_file(raw_url: str, dest: Path) -> bool:
     """Download a file from GitHub raw URL with atomic write.
     
@@ -425,8 +452,6 @@ def _download_file(raw_url: str, dest: Path) -> bool:
     Returns:
         True if download succeeded, False otherwise.
     """
-    import tempfile
-    
     # Security: only allow HTTPS downloads
     if not raw_url.startswith('https://'):
         logger.error("Refusing to download from non-HTTPS URL: %s", raw_url)
@@ -438,29 +463,13 @@ def _download_file(raw_url: str, dest: Path) -> bool:
             content = resp.read()
         
         # Validate content is not HTML error page (GitHub returns HTML on errors)
-        if content.startswith(b'<!DOCTYPE') or content.startswith(b'<html'):
+        if _is_html_payload(content):
             logger.error("Downloaded HTML instead of expected file from %s", raw_url)
             return False
-        
-        # Atomic write: write to temp file then rename
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            mode='wb', dir=dest.parent, delete=False, suffix='.tmp'
-        ) as tmp:
-            tmp.write(content)
-            tmp_path = Path(tmp.name)
-        
-        # Atomic rename (on POSIX) / replace on Windows
-        tmp_path.replace(dest)
-        return True
+
+        return _write_bytes_atomic(dest, content)
     except urllib.error.URLError as e:
         logger.error("Failed to download %s: %s", raw_url, e)
-        return False
-    except OSError as e:
-        logger.error("Failed to write file %s: %s", dest, e)
-        # Cleanup temp file if it exists
-        if 'tmp_path' in locals() and tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
         return False
 
 
@@ -507,10 +516,14 @@ def update(force: bool = False) -> bool:
                 stored_hash = stored_hashes.get(filename, "")
                 
                 if remote_hash != stored_hash:
+                    if _is_html_payload(remote_content):
+                        logger.error("Downloaded HTML instead of expected file from %s", urls["raw_url"])
+                        return False
+
                     # Content changed, save file
                     dest = _DATA_DIR / filename
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(remote_content)
+                    if not _write_bytes_atomic(dest, remote_content):
+                        return False
                     needs_update = True
                     logger.debug("Updated %s (content changed)", filename)
                 else:

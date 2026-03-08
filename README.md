@@ -256,12 +256,12 @@ Update wiki data from OrcaSlicer GitHub:
 
 | Category | Settings |
 |----------|----------|
-| Basic | Layer height, first layer height, line width, flow, wall loops, infill, top/bottom shells, brim, support, seam |
+| Basic | Layer height, first layer height, line width, flow, wall loops, infill, top/bottom shells, brim, support (toggle/type/threshold/top-bottom Z distance), seam |
 | Speeds | First layer, outer/inner wall, infill, top surface, travel, bridge |
 | Patterns | Infill pattern, top surface pattern, print sequence, spiral/vase mode, ironing, fuzzy skin |
-| Retraction | Length, speed, Z-hop, pressure advance |
+| Retraction | Length, speed, Z-hop, pressure advance, max volumetric speed |
 | Cooling | Fan min/max, layer cooling slowdown |
-| Temperature | Nozzle, bed |
+| Temperature | First-layer nozzle/bed, nozzle, bed |
 | Features | Arc fitting, overhang speed, timelapse |
 
 **CUSTOM GLOBAL SETTINGS** -- parameters changed from the profile defaults.

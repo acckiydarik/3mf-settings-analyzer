@@ -1,10 +1,10 @@
 {
   "_meta": {
-    "updated": "2026-02-16 16:36 UTC",
+    "updated": "2026-03-08 16:07 UTC",
     "wiki_base": "https://github.com/OrcaSlicer/OrcaSlicer/wiki/",
     "sha": {
-      "Tab.cpp": "e866c46c5b0c",
-      "PrintConfig.cpp": "8542b906c3a4"
+      "Tab.cpp": "8eb2034d1e64",
+      "PrintConfig.cpp": "ac5fcca8f241"
     },
     "total_settings": 696,
     "with_wiki_page": 468
@@ -68,7 +68,7 @@
     "adaptive_pressure_advance_model": {
       "type": "string",
       "label": "Adaptive pressure advance measurements (beta)",
-      "tooltip": "Add sets of pressure advance (PA) values, the volumetric flow speeds and accelerations they were measured at, separated by a comma. One set of values per line. For example\n0.04,3.96,3000\n0.033,3.96,10000\n0.029,7.91,3000\n0.026,7.91,10000\n\nHow to calibrate:\n1. Run the pressure advance test for at least 3 speeds per acceleration value. It is recommended that the test is run for at least the speed of the external perimeters, the speed of the internal perimeters and the fastest feature print speed in your profile (usually its the sparse or solid infill). Then run them for the same speeds for the slowest and fastest print accelerations, and no faster than the recommended maximum acceleration as given by the Klipper input shaper\n2. Take note of the optimal PA value for each volumetric flow speed and acceleration. You can find the flow number by selecting flow from the color scheme drop down and move the horizontal slider over the PA pattern lines. The number should be visible at the bottom of the page. The ideal PA value should be decreasing the higher the volumetric flow is. If it is not, confirm that your extruder is functioning correctly. The slower and with less acceleration you print, the larger the range of acceptable PA values. If no difference is visible, use the PA value from the faster test\n3. Enter the triplets of PA values, Flow and Accelerations in the text box here and save your filament profile"
+      "tooltip": "Add sets of pressure advance (PA) values, the volumetric flow speeds and accelerations they were measured at, separated by a comma. One set of values per line. For example\n0.04,3.96,3000\n0.033,3.96,10000\n0.029,7.91,3000\n0.026,7.91,10000\n\nHow to calibrate:\n1. Run the pressure advance test for at least 3 speeds per acceleration value. It is recommended that the test is run for at least the speed of the external perimeters, the speed of the internal perimeters and the fastest feature print speed in your profile (usually its the sparse or solid infill). Then run them for the same speeds for the slowest and fastest print accelerations, and no faster than the recommended maximum acceleration as given by the Klipper input shaper\n2. Take note of the optimal PA value for each volumetric flow speed and acceleration. You can find the flow number by selecting flow from the color scheme drop down and move the horizontal slider over the PA pattern lines. The number should be visible at the bottom of the page. The ideal PA value should be decreasing the higher the volumetric flow is. If it is not, confirm that your extruder is functioning correctly. The slower and with less acceleration you print, the larger the range of acceptable PA values. If no difference is visible, use the PA value from the faster test\n3. Enter the triplets of PA values, Flow and Accelerations in the text box here and save your filament profile."
     },
     "adaptive_pressure_advance_overhangs": {
       "type": "bool",
@@ -570,7 +570,7 @@
       "category": "Speed",
       "sidetext": "mm",
       "tooltip": "Marlin Firmware Junction Deviation (replaces the traditional XY Jerk setting).",
-      "default": "0",
+      "default": "0.f",
       "wiki_page": "speed_settings_jerk_xy#junction-deviation"
     },
     "default_print_profile": {
@@ -621,7 +621,7 @@
       "type": "enum",
       "label": "Filter out small internal bridges",
       "category": "Quality",
-      "tooltip": "This option can help reduce pillowing on top surfaces in heavily slanted or curved models.\nBy default, small internal bridges are filtered out and the internal solid infill is printed directly over the sparse infill. This works well in most cases, speeding up printing without too much compromise on top surface quality.\nHowever, in heavily slanted or curved models, especially where too low a sparse infill density is used, this may result in curling of the unsupported solid infill, causing pillowing.\nEnabling limited filtering or no filtering will print internal bridge layer over slightly unsupported internal solid infill. The options below control the sensitivity of the filtering, i.e. they control where internal bridges are created:\n1. Filter - enables this option. This is the default behavior and works well in most cases\n2. Limited filtering - creates internal bridges on heavily slanted surfaces while avoiding unnecessary bridges. This works well for most difficult models\n3. No filtering - creates internal bridges on every potential internal overhang. This option is useful for heavily slanted top surface models; however, in most cases, it creates too many unnecessary bridges",
+      "tooltip": "This option can help reduce pillowing on top surfaces in heavily slanted or curved models.\nBy default, small internal bridges are filtered out and the internal solid infill is printed directly over the sparse infill. This works well in most cases, speeding up printing without too much compromise on top surface quality.\nHowever, in heavily slanted or curved models, especially where too low a sparse infill density is used, this may result in curling of the unsupported solid infill, causing pillowing.\nEnabling limited filtering or no filtering will print internal bridge layer over slightly unsupported internal solid infill. The options below control the sensitivity of the filtering, i.e. they control where internal bridges are created:\n1. Filter - enables this option. This is the default behavior and works well in most cases\n2. Limited filtering - creates internal bridges on heavily slanted surfaces while avoiding unnecessary bridges. This works well for most difficult models\n3. No filtering - creates internal bridges on every potential internal overhang. This option is useful for heavily slanted top surface models; however, in most cases, it creates too many unnecessary bridges.",
       "wiki_page": "quality_settings_bridging#filter-out-small-internal-bridges"
     },
     "dont_slow_down_outer_wall": {
@@ -638,7 +638,7 @@
     },
     "downward_settings": {
       "type": "string",
-      "label": "downward machines settings",
+      "label": "Downward machines settings",
       "tooltip": "The machine settings list needs to do downward checking."
     },
     "draft_shield": {
@@ -1130,18 +1130,21 @@
       "type": "float",
       "label": "Ironing inset",
       "category": "Quality",
+      "sidetext": "mm",
       "tooltip": "Filament-specific override for ironing inset. This allows you to customize the distance to keep from the edges when ironing for each filament type."
     },
     "filament_ironing_spacing": {
       "type": "float",
       "label": "Ironing line spacing",
       "category": "Quality",
+      "sidetext": "mm",
       "tooltip": "Filament-specific override for ironing line spacing. This allows you to customize the spacing between ironing lines for each filament type."
     },
     "filament_ironing_speed": {
       "type": "float",
       "label": "Ironing speed",
       "category": "Speed",
+      "sidetext": "mm/s",
       "tooltip": "Filament-specific override for ironing speed. This allows you to customize the print speed of ironing lines for each filament type."
     },
     "filament_is_support": {
@@ -1278,7 +1281,6 @@
     "filament_tower_interface_print_temp": {
       "type": "int",
       "label": "Interface layer print temperature",
-      "sidetext": "°C",
       "tooltip": "Print temperature for prime tower interface layer (where different materials meet). If set to -1, use max recommended nozzle temperature.",
       "wiki_page": "material_multimaterial#multimaterial-wipe-tower-parameters"
     },
@@ -1292,7 +1294,6 @@
     "filament_tower_ironing_area": {
       "type": "float",
       "label": "Tower ironing area",
-      "sidetext": "mm²",
       "tooltip": "Ironing area for prime tower interface layer (where different materials meet).",
       "wiki_page": "material_multimaterial#multimaterial-wipe-tower-parameters"
     },
@@ -1475,7 +1476,7 @@
       "category": "Others",
       "sidetext": "mm",
       "tooltip": "The average distance between the random points introduced on each line segment.",
-      "default": "0.3",
+      "default": "0.3f",
       "wiki_page": "others_settings_fuzzy_skin#point-distance"
     },
     "fuzzy_skin_scale": {
@@ -1543,7 +1544,7 @@
     "gcode_label_objects": {
       "type": "bool",
       "label": "Label objects",
-      "tooltip": "Enable this to add comments into the G-code labeling print moves with what object they belong to, which is useful for the Octoprint CancelObject plugin. This settings is NOT compatible with Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.",
+      "tooltip": "Enable this to add comments into the G-code labeling print moves with what object they belong to, which is useful for the Octoprint CancelObject plug-in. This setting is NOT compatible with Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.",
       "default": "1",
       "wiki_page": "others_settings_g_code_output#label-objects"
     },
@@ -2083,7 +2084,7 @@
       "type": "enum",
       "label": "Ironing Type",
       "category": "Quality",
-      "tooltip": "Ironing is using small flow to print on same height of surface again to make flat surface more smooth. This setting controls which layer being ironed",
+      "tooltip": "Ironing is using small flow to print on same height of surface again to make flat surface more smooth. This setting controls which layer being ironed.",
       "wiki_page": "quality_settings_ironing#type"
     },
     "is_extruder_used": {
@@ -2850,7 +2851,7 @@
       "label": "Flow ratio",
       "category": "Quality",
       "tooltip": "The material may have volumetric change after switching between molten and crystalline states. This setting changes all extrusion flow of this filament in G-code proportionally. The recommended value range is between 0.95 and 1.05. You may be able to tune this value to get a nice flat surface if there is slight overflow or underflow.\n\nThe final object flow ratio is this value multiplied by the filament flow ratio.",
-      "default": "1",
+      "default": "1.f",
       "wiki_page": "quality_settings_wall_and_surfaces#surface-flow-ratio"
     },
     "print_host": {
@@ -3745,7 +3746,7 @@
       "type": "enum",
       "label": "Base pattern",
       "category": "Support",
-      "tooltip": "Line pattern of support.",
+      "tooltip": "Line pattern of support.\n\nThe Default option for Tree supports is Hollow, which means no base pattern. For other support types, the Default option is the Rectilinear pattern.\n\nNOTE: For Organic supports, the two walls are supported only with the Hollow/Default base pattern. The Lightning base pattern is supported only by Tree Slim/Strong/Hybrid supports. For the other support types, the Rectilinear will be used instead of Lightning.",
       "wiki_page": "support_settings_advanced#base-pattern"
     },
     "support_base_pattern_spacing": {
@@ -4118,7 +4119,7 @@
     "timelapse_type": {
       "type": "enum",
       "label": "Timelapse",
-      "tooltip": "If smooth or traditional mode is selected, a timelapse video will be generated for each print. After each layer is printed, a snapshot is taken with the chamber camera. All of these snapshots are composed into a timelapse video when printing completes. If smooth mode is selected, the toolhead will move to the excess chute after each layer is printed and then take a snapshot. Since the melt filament may leak from the nozzle during the process of taking a snapshot, prime tower is required for smooth mode to wipe nozzle.",
+      "tooltip": "If smooth or traditional mode is selected, a timelapse video will be generated for each print. After each layer is printed, a snapshot is taken with the chamber camera. All of these snapshots are composed into a timelapse video when printing completes. If smooth mode is selected, the toolhead will move to the excess chute after each layer is printed and then take a snapshot. Since the melt filament may leak from the nozzle during the process of taking a snapshot, a prime tower is required for smooth mode to wipe nozzle.",
       "wiki_page": "others_settings_special_mode#timelapse"
     },
     "timestamp": {
