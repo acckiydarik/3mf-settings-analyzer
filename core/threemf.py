@@ -322,22 +322,27 @@ class ThreeMFAnalyzer:
                         value = value[0]
                     custom[key] = value
 
-        # Filament overrides (index 1+)
+        # Filament overrides (index 1+).
+        # diff_settings[N] (N>=1) lists keys overridden for filament N.
+        # The corresponding value sits at values[N-1] in the settings array.
         for fil_idx in range(1, len(diff_settings)):
             entry = diff_settings[fil_idx]
             if not entry:
                 continue
+            val_index = fil_idx - 1
             keys = [k.strip() for k in entry.split(';') if k.strip()]
             for key in keys:
-                if key in self.project_settings and key not in custom:
-                    value = self.project_settings[key]
-                    if isinstance(value, list):
-                        if len(value) == 1:
-                            value = value[0]
-                        elif all(v == value[0] for v in value):
-                            value = value[0]
-                        else:
-                            value = ','.join(str(v) for v in value)
+                if key not in self.project_settings:
+                    continue
+                value = self.project_settings[key]
+                if isinstance(value, list):
+                    if 0 <= val_index < len(value):
+                        value = value[val_index]
+                    elif len(value) == 1:
+                        value = value[0]
+                if key in custom:
+                    custom[f"{key} (Filament {fil_idx})"] = value
+                else:
                     custom[key] = value
 
         return custom

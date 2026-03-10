@@ -283,6 +283,99 @@ class TestGcodeCustomGlobalSettings:
         assert 'layer_height' in custom
         assert custom['layer_height'] == '0.2'
 
+    def test_single_filament_trims_comma_values(self, temp_dir: Path):
+        """Single filament should show only the first value from comma list."""
+        gcode_path = temp_dir / "single_fil.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; filament_settings_id = "Generic PLA"
+; filament_max_volumetric_speed = 12,6,6,6
+; different_settings_to_system = filament_max_volumetric_speed
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert custom['filament_max_volumetric_speed'] == '12'
+
+    def test_multi_filament_identical_values(self, temp_dir: Path):
+        """Multiple filaments with identical values should show single value."""
+        gcode_path = temp_dir / "multi_same.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; filament_settings_id = "PLA";"PLA"
+; filament_flow_ratio = 0.96,0.96,0.96,0.96
+; different_settings_to_system = filament_flow_ratio
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert custom['filament_flow_ratio'] == '0.96'
+
+    def test_multi_filament_different_values(self, temp_dir: Path):
+        """Multiple filaments with different values should show labelled values."""
+        gcode_path = temp_dir / "multi_diff.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; filament_settings_id = "PLA";"PETG"
+; filament_max_volumetric_speed = 12,6,6,6
+; different_settings_to_system = filament_max_volumetric_speed
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert custom['filament_max_volumetric_speed'] == 'F1: 12, F2: 6'
+
+    def test_active_filament_count_single(self, temp_dir: Path):
+        """_get_active_filament_count should return 1 for single filament."""
+        gcode_path = temp_dir / "count1.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; filament_settings_id = "Generic PLA"
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+        assert analyzer._get_active_filament_count() == 1
+
+    def test_active_filament_count_multiple(self, temp_dir: Path):
+        """_get_active_filament_count should return N for N semicolon-separated IDs."""
+        gcode_path = temp_dir / "count3.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; filament_settings_id = "PLA";"PETG";"TPU"
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+        assert analyzer._get_active_filament_count() == 3
+
+    def test_active_filament_count_missing(self, temp_dir: Path):
+        """_get_active_filament_count should return 1 when key is missing."""
+        gcode_path = temp_dir / "no_fil_id.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; layer_height = 0.2
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+        assert analyzer._get_active_filament_count() == 1
+
+    def test_three_filaments_different_values(self, temp_dir: Path):
+        """Three filaments should trim to 3 values and label when different."""
+        gcode_path = temp_dir / "tri_fil.gcode"
+        gcode_path.write_text("""; CONFIG_BLOCK_START
+; filament_settings_id = "PLA";"PETG";"TPU"
+; pressure_advance = 0.04,0.06,0.02,0.04
+; different_settings_to_system = pressure_advance
+; CONFIG_BLOCK_END
+""", encoding='utf-8')
+        analyzer = GcodeAnalyzer(gcode_path)
+        analyzer.analyze()
+
+        custom = analyzer._get_custom_global_settings()
+        assert custom['pressure_advance'] == 'F1: 0.04, F2: 0.06, F3: 0.02'
+
 
 # ═══════════════════════════════════════════════════════════════
 # Test Edge Cases for Gcode Parsing

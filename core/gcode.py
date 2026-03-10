@@ -261,16 +261,50 @@ class GcodeAnalyzer:
 
         return [str(value)]
 
+    def _get_active_filament_count(self) -> int:
+        """Return the number of active filaments based on filament_settings_id.
+
+        ``filament_settings_id`` in Gcode is semicolon-separated when multiple
+        filaments are used (e.g. ``"Generic PLA";"Bambu PETG"``).
+        """
+        raw = self.settings.get('filament_settings_id', '')
+        if not raw:
+            return 1
+        parts = [p.strip().strip('"') for p in raw.split(';') if p.strip()]
+        return max(len(parts), 1)
+
     def _get_custom_global_settings(self) -> Dict[str, Any]:
-        """Extract custom global settings from different_settings_to_system."""
-        custom = {}
+        """Extract custom global settings from different_settings_to_system.
+
+        For multi-filament prints, comma-separated values are trimmed to only
+        the active filament count and labelled when values differ between
+        filaments (e.g. ``F1: 12, F2: 6``).
+        """
+        custom: Dict[str, Any] = {}
 
         diff_settings = self.settings.get('different_settings_to_system', '')
-        if diff_settings:
-            keys = [k.strip() for k in diff_settings.split(';') if k.strip()]
-            for key in keys:
-                if key in self.settings:
-                    custom[key] = self.settings[key]
+        if not diff_settings:
+            return custom
+
+        n_filaments = self._get_active_filament_count()
+        keys = [k.strip() for k in diff_settings.split(';') if k.strip()]
+
+        for key in keys:
+            if key not in self.settings:
+                continue
+            raw = self.settings[key]
+
+            if ',' in str(raw):
+                parts = [p.strip() for p in str(raw).split(',')]
+                active = parts[:n_filaments]
+                if len(active) == 1 or len(set(active)) == 1:
+                    custom[key] = active[0]
+                else:
+                    custom[key] = ', '.join(
+                        f"F{i + 1}: {v}" for i, v in enumerate(active)
+                    )
+            else:
+                custom[key] = raw
 
         return custom
 
