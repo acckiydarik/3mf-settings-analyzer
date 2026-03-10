@@ -47,6 +47,17 @@ SINGLE_LABEL_WIDTH = 31  # Label column width in single-file tables
 FILE_EXTENSION_3MF = '.3mf'
 FILE_EXTENSION_GCODE = '.gcode'
 
+# Bed type -> temperature key mapping.
+# OrcaSlicer stores per-bed-type temperatures under separate keys;
+# the active bed type is indicated by ``curr_bed_type``.
+BED_TYPE_TEMP_KEYS: Dict[str, tuple] = {
+    'Textured PEI Plate': ('textured_plate_temp', 'textured_plate_temp_initial_layer'),
+    'Cool Plate': ('cool_plate_temp', 'cool_plate_temp_initial_layer'),
+    'Engineering Plate': ('eng_plate_temp', 'eng_plate_temp_initial_layer'),
+    'High Temp Plate': ('eng_plate_temp', 'eng_plate_temp_initial_layer'),
+}
+BED_TYPE_TEMP_KEYS_DEFAULT = ('hot_plate_temp', 'hot_plate_temp_initial_layer')
+
 # Gcode block markers
 GCODE_HEADER_START = '; HEADER_BLOCK_START'
 GCODE_HEADER_END = '; HEADER_BLOCK_END'

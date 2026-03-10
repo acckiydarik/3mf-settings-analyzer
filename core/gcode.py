@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Set, Union
 
 from core.constants import (
+    BED_TYPE_TEMP_KEYS,
+    BED_TYPE_TEMP_KEYS_DEFAULT,
     GCODE_CONFIG_END,
     GCODE_CONFIG_START,
     GCODE_HEADER_END,
@@ -285,10 +287,23 @@ class GcodeAnalyzer:
             self._get_value('nozzle_temperature_initial_layer', '')
             or self._get_value('first_layer_temperature', '')
         )
+
+        # Resolve bed temperature based on active bed type.
+        bed_type = self._get_value('curr_bed_type', '')
+        bed_key, bed_key_initial = BED_TYPE_TEMP_KEYS.get(
+            bed_type, BED_TYPE_TEMP_KEYS_DEFAULT,
+        )
+        profile['bed_temperature'] = (
+            self._get_value(bed_key, '')
+            or self._get_value('hot_plate_temp', '')
+        )
         profile['first_layer_bed_temperature'] = (
-            self._get_value('hot_plate_temp_initial_layer', '')
+            self._get_value(bed_key_initial, '')
+            or self._get_value('hot_plate_temp_initial_layer', '')
             or self._get_value('first_layer_bed_temperature', '')
         )
+
+
         return profile
 
     def _build_statistics(self) -> Dict[str, Any]:
@@ -339,14 +354,24 @@ class GcodeAnalyzer:
         stats['filament_density'] = self._get_list_value('filament_density', [])
         stats['filament_diameter'] = self._get_list_value('filament_diameter', [])
 
-        # Temperatures
-        stats['first_layer_bed_temp'] = self._get_value('first_layer_bed_temperature', '') or \
-                                         self._get_value('hot_plate_temp_initial_layer', '')
+        # Temperatures -- resolve bed temp keys using active bed type.
+        bed_type = self._get_value('curr_bed_type', '')
+        bed_key, bed_key_initial = BED_TYPE_TEMP_KEYS.get(
+            bed_type, BED_TYPE_TEMP_KEYS_DEFAULT,
+        )
+        stats['first_layer_bed_temp'] = (
+            self._get_value(bed_key_initial, '')
+            or self._get_value('hot_plate_temp_initial_layer', '')
+            or self._get_value('first_layer_bed_temperature', '')
+        )
         stats['first_layer_nozzle_temp'] = self._get_value('first_layer_temperature', '') or \
                                             self._get_value('nozzle_temperature_initial_layer', '')
         stats['nozzle_temp'] = self._get_list_value('nozzle_temperature', [])
-        stats['bed_temp'] = self._get_value('hot_plate_temp', '') or \
-                            self._get_value('bed_temperature', '')
+        stats['bed_temp'] = (
+            self._get_value(bed_key, '')
+            or self._get_value('hot_plate_temp', '')
+            or self._get_value('bed_temperature', '')
+        )
 
         # Printer/Machine info
         stats['printer_model'] = self._get_value('printer_model', '')

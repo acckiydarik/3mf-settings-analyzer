@@ -18,6 +18,8 @@ except ImportError:
     )
 
 from core.constants import (
+    BED_TYPE_TEMP_KEYS,
+    BED_TYPE_TEMP_KEYS_DEFAULT,
     BOOL_TRUE,
     DEFAULT_EXTRUDER,
     DEFAULT_IDENTIFY_ID,
@@ -301,19 +303,41 @@ class ThreeMFAnalyzer:
         return val
 
     def _get_custom_global_settings(self) -> Dict[str, Any]:
-        """Extract custom global settings."""
+        """Extract custom global settings (process + filament overrides)."""
         custom = {}
 
         diff_settings = self.project_settings.get('different_settings_to_system', [])
-        # Validate that diff_settings is a non-empty list before accessing first element
-        if isinstance(diff_settings, list) and len(diff_settings) > 0 and diff_settings[0]:
-            # Filter empty strings that result from split on empty or ";;"
+
+
+        if not isinstance(diff_settings, list) or not diff_settings:
+            return custom
+
+        # Process overrides (index 0)
+        if diff_settings[0]:
             keys = [k.strip() for k in diff_settings[0].split(';') if k.strip()]
             for key in keys:
                 if key in self.project_settings:
                     value = self.project_settings[key]
                     if isinstance(value, list) and len(value) == 1:
                         value = value[0]
+                    custom[key] = value
+
+        # Filament overrides (index 1+)
+        for fil_idx in range(1, len(diff_settings)):
+            entry = diff_settings[fil_idx]
+            if not entry:
+                continue
+            keys = [k.strip() for k in entry.split(';') if k.strip()]
+            for key in keys:
+                if key in self.project_settings and key not in custom:
+                    value = self.project_settings[key]
+                    if isinstance(value, list):
+                        if len(value) == 1:
+                            value = value[0]
+                        elif all(v == value[0] for v in value):
+                            value = value[0]
+                        else:
+                            value = ','.join(str(v) for v in value)
                     custom[key] = value
 
         return custom
@@ -330,10 +354,23 @@ class ThreeMFAnalyzer:
             self._get_value('nozzle_temperature_initial_layer', '')
             or self._get_value('first_layer_temperature', '')
         )
+
+        # Resolve bed temperature based on active bed type.
+        bed_type = self.project_settings.get('curr_bed_type', '')
+        bed_key, bed_key_initial = BED_TYPE_TEMP_KEYS.get(
+            bed_type, BED_TYPE_TEMP_KEYS_DEFAULT,
+        )
+        profile['bed_temperature'] = (
+            self._get_value(bed_key, '')
+            or self._get_value('hot_plate_temp', '')
+        )
         profile['first_layer_bed_temperature'] = (
-            self._get_value('hot_plate_temp_initial_layer', '')
+            self._get_value(bed_key_initial, '')
+            or self._get_value('hot_plate_temp_initial_layer', '')
             or self._get_value('first_layer_bed_temperature', '')
         )
+
+
         return profile
 
     def _format_brim(self, brim_type: str) -> str:
