@@ -248,6 +248,9 @@ def _print_profile_panel(console: Console, profile: Dict[str, Any]):
         for i, f in enumerate(filaments):
             profile_table.add_row(f"Filament {i+1}", f"[magenta]{f}[/magenta]")
 
+    if profile.get('flow_mode'):
+        profile_table.add_row("Flow Mode", f"[cyan]{escape(profile['flow_mode'])}[/cyan]")
+
     console.rule("[bold bright_yellow]PROFILE[/bold bright_yellow]", style="grey50")
     console.print(Panel(profile_table, border_style="grey50", box=box.ROUNDED))
 

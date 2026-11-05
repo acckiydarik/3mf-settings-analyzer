@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from core.constants import (
     BED_TYPE_TEMP_KEYS,
@@ -21,6 +21,7 @@ from core.constants import (
     TAIL_READ_SIZE,
     build_common_profile,
 )
+from core.flow_variant import FlowVariantResolver
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,16 @@ class GcodeAnalyzer:
         self.header_info: Dict[str, str] = {}
         self.statistics: Dict[str, Any] = {}
         self.object_names: Set[str] = set()
+
+    @property
+    def flow(self) -> FlowVariantResolver:
+        return FlowVariantResolver(self._get_list_setting)
+
+    def _get_list_setting(self, key: str) -> Optional[List[str]]:
+        """Return a setting as a list of strings, or None if absent."""
+        if key not in self.settings:
+            return None
+        return self._get_list_value(key)
 
     def analyze(self) -> Dict[str, Any]:
         """Main analysis method. Extracts settings and statistics from gcode file.
@@ -227,7 +238,8 @@ class GcodeAnalyzer:
         """Get value from settings, handling list formats.
 
         Gcode settings often have comma-separated values for multi-extruder setups.
-        This method returns the first value for such settings.
+        This method returns the first value for such settings, except Snapmaker
+        flow-variant keys, which resolve to the active flow mode of filament 1.
         """
         value = self.settings.get(key, default)
         if value is None:
@@ -241,7 +253,13 @@ class GcodeAnalyzer:
         # Handle comma-separated list (numeric values)
         if ',' in str(value):
             parts = [p.strip() for p in str(value).split(',') if p.strip()]
-            return parts[0] if parts else default
+            if not parts:
+                return default
+            flow = self.flow
+            flow_idx = flow.index_for(key, 0)
+            if flow_idx is not None:
+                return flow.pick(parts, flow_idx)
+            return parts[0]
 
         return value
 
@@ -278,7 +296,8 @@ class GcodeAnalyzer:
 
         For multi-filament prints, comma-separated values are trimmed to only
         the active filament count and labelled when values differ between
-        filaments (e.g. ``F1: 12, F2: 6``).
+        filaments (e.g. ``F1: 12, F2: 6``). Snapmaker flow-variant keys are
+        resolved to the active flow mode of each filament instead.
         """
         custom: Dict[str, Any] = {}
 
@@ -287,6 +306,7 @@ class GcodeAnalyzer:
             return custom
 
         n_filaments = self._get_active_filament_count()
+        flow = self.flow
         keys = [k.strip() for k in diff_settings.split(';') if k.strip()]
 
         for key in keys:
@@ -296,6 +316,10 @@ class GcodeAnalyzer:
 
             if ',' in str(raw):
                 parts = [p.strip() for p in str(raw).split(',')]
+                resolved = flow.resolve_per_filament(key, parts, n_filaments)
+                if resolved is not None:
+                    custom[key] = resolved
+                    continue
                 active = parts[:n_filaments]
                 if len(active) == 1 or len(set(active)) == 1:
                     custom[key] = active[0]
@@ -314,6 +338,7 @@ class GcodeAnalyzer:
         profile['printer'] = self.settings.get('printer_settings_id', 'Unknown')
         profile['process'] = self.settings.get('print_settings_id', 'Unknown')
         profile['filaments'] = self._get_list_value('filament_settings_id', ['Unknown'])
+        profile['flow_mode'] = self.flow.mode_label(self._get_active_filament_count())
         # Gcode uses 'first_layer_height' instead of 'initial_layer_print_height'
         profile['initial_layer_print_height'] = self._get_value('first_layer_height', '')
         # Support both legacy and current first-layer temperature keys.

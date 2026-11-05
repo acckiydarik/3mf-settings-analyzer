@@ -13,6 +13,7 @@ A command-line tool that extracts and displays print settings from **3MF** and *
 - **Part hierarchy** -- displays compound objects with their sub-components
 - **Multi-plate support** -- handles projects with multiple build plates
 - **Diff mode** -- side-by-side comparison of custom values against profile defaults
+- **Snapmaker flow modes** -- settings stored per flow mode (standard / high flow) are resolved to the value actually used, and the active mode is shown in the Profile panel
 
 ### Gcode analysis
 
@@ -211,6 +212,7 @@ Update wiki data from OrcaSlicer GitHub:
 │   Printer       Snapmaker U1 (0.4 nozzle)                                    │
 │   Process       0.16 High Quality @Snapmaker U1 (0.4 nozzle)                 │
 │   Filament 1    Snapmaker PLA SnapSpeed @U1                                  │
+│   Flow Mode     Standard                                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ──────────────────────────────── GLOBAL SETTINGS ───────────────────────────────
 ╭──────────────────────────────────────────────────────────────────────────────╮
@@ -250,7 +252,7 @@ Update wiki data from OrcaSlicer GitHub:
 
 ### Output sections
 
-**PROFILE** -- printer name, process preset, filament list.
+**PROFILE** -- printer name, process preset, filament list. For Snapmaker Orca files, also the active flow mode (`Standard` / `High Flow`, per filament if they differ).
 
 **GLOBAL SETTINGS** -- all key print parameters grouped by category:
 
@@ -358,6 +360,12 @@ file.3mf
 
 The analyzer reads `project_settings.config` for global/profile settings and `model_settings.config` for per-object and per-part overrides.
 
+### Snapmaker flow modes
+
+Snapmaker Orca stores some settings as one value per flow mode, e.g. `inner_wall_speed = ["150", "600"]` (standard, high flow). Speeds, accelerations and jerks are process flow-variant keys. Temperatures, pressure advance, flow ratio, retraction and fan are filament flow-variant keys, stored in a flattened per-filament layout sized by `filament_flow_step_size`.
+
+When `process_flow_support` / `filament_flow_support` are present, the analyzer picks the effective value with the same rules as Snapmaker Orca v2.4.0 (`get_config_idx()` in `PrintConfig.cpp`): the filament's `filament_volume_type` is looked up in the matching `*_flow_support` list, falling back to the first value. Only the active value is shown. Files from other slicers are unaffected.
+
 ### Gcode files
 
 Gcode files are plain-text machine instruction files. OrcaSlicer-compatible slicers embed metadata as comments with a defined block structure:
@@ -403,6 +411,7 @@ This approach is **efficient** (single pass), **safe** (max line length check), 
 │   ├── field_defs.py               # Shared field definitions for output + compare
 │   ├── threemf.py                  # ThreeMFAnalyzer class + _is_custom helper
 │   ├── gcode.py                    # GcodeAnalyzer class
+│   ├── flow_variant.py             # Snapmaker standard / high-flow value resolution
 │   ├── output.py                   # Rich formatting: panels, tables, colors, helpers
 │   ├── compare.py                  # Side-by-side comparison for 2-4 files with diff highlighting
 │   ├── cli.py                      # argparse, main(), multi-file routing, setup_logging()
@@ -419,6 +428,7 @@ This approach is **efficient** (single pass), **safe** (max line length check), 
 │   ├── test_output.py              # Tests for core.output
 │   ├── test_cli.py                 # Tests for core.cli
 │   ├── test_compare.py             # Tests for core.compare (comparison mode)
+│   ├── test_flow_variant.py        # Tests for core.flow_variant
 │   └── test_settings_wiki.py       # Tests for settings_wiki
 ├── README.md                   # Documentation
 ├── LICENSE                     # MIT license

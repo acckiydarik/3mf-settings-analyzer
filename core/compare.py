@@ -143,6 +143,12 @@ def _print_compare_profile(
                 values.append("")
         _add_row(table, f"Filament {i + 1}", values)
 
+    if any(p.get('flow_mode') for p in profiles):
+        _add_row(table, "Flow Mode", [
+            f"[cyan]{escape(p['flow_mode'])}[/cyan]" if p.get('flow_mode') else ""
+            for p in profiles
+        ])
+
     console.rule("[bold bright_yellow]PROFILE[/bold bright_yellow]", style="grey50")
     console.print(Panel(table, border_style="grey50", box=box.ROUNDED))
 

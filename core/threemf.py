@@ -27,6 +27,7 @@ from core.constants import (
     SYSTEM_KEYS,
     build_common_profile,
 )
+from core.flow_variant import FlowVariantResolver
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,10 @@ class ThreeMFAnalyzer:
         self.project_settings: Dict = {}
         self.objects: Dict[str, Dict] = {}
         self.plates: List[Dict] = []
+
+    @property
+    def flow(self) -> FlowVariantResolver:
+        return FlowVariantResolver(self._get_list_setting)
 
     def analyze(self) -> Dict[str, Any]:
         """Main analysis method. Extracts and returns all settings from the 3MF file."""
@@ -136,6 +141,19 @@ class ThreeMFAnalyzer:
                 raise OSError(f"Failed to read project settings: {config_path}") from e
         else:
             logger.warning("Project settings file not found: %s", config_path)
+
+    def _get_list_setting(self, key: str) -> Optional[List[str]]:
+        """Return a project setting as a list of strings, or None if absent."""
+        val = self.project_settings.get(key)
+        if val is None:
+            return None
+        if isinstance(val, list):
+            return [str(v) for v in val]
+        return [str(val)]
+
+    def _filament_count(self) -> int:
+        fils = self.project_settings.get('filament_settings_id')
+        return len(fils) if isinstance(fils, list) and fils else 1
 
     def _parse_model_settings(self):
         """Parse model_settings.config (XML).
@@ -289,6 +307,8 @@ class ThreeMFAnalyzer:
             default: Default value if key not found.
             index: Which element to return for list values.
                    0 = first element (default), -1 = entire list.
+                   For Snapmaker flow-variant keys the default resolves to
+                   the active flow mode of filament 1.
 
         Returns:
             The setting value, or default if not found.
@@ -299,6 +319,11 @@ class ThreeMFAnalyzer:
                 return val  # Return entire list
             if not val:  # Empty list
                 return default
+            if index == 0:
+                flow = self.flow
+                flow_idx = flow.index_for(key, 0)
+                if flow_idx is not None:
+                    return flow.pick(val, flow_idx)
             return val[index] if 0 <= index < len(val) else default
         return val
 
@@ -312,30 +337,40 @@ class ThreeMFAnalyzer:
         if not isinstance(diff_settings, list) or not diff_settings:
             return custom
 
+        flow = self.flow
+
         # Process overrides (index 0)
         if diff_settings[0]:
+            n_filaments = self._filament_count()
             keys = [k.strip() for k in diff_settings[0].split(';') if k.strip()]
             for key in keys:
                 if key in self.project_settings:
                     value = self.project_settings[key]
-                    if isinstance(value, list) and len(value) == 1:
-                        value = value[0]
+                    if isinstance(value, list):
+                        resolved = flow.resolve_per_filament(key, value, n_filaments)
+                        if resolved is not None:
+                            value = resolved
+                        elif len(value) == 1:
+                            value = value[0]
                     custom[key] = value
 
         # Filament overrides (index 1+).
         # diff_settings[N] (N>=1) lists keys overridden for filament N.
-        # The corresponding value sits at values[N-1] in the settings array.
+        # The corresponding value sits at values[N-1] in the settings array,
+        # except Snapmaker flow-variant keys, which use a flattened layout.
         for fil_idx in range(1, len(diff_settings)):
             entry = diff_settings[fil_idx]
             if not entry:
                 continue
-            val_index = fil_idx - 1
             keys = [k.strip() for k in entry.split(';') if k.strip()]
             for key in keys:
                 if key not in self.project_settings:
                     continue
                 value = self.project_settings[key]
                 if isinstance(value, list):
+                    val_index = flow.index_for(key, fil_idx - 1)
+                    if val_index is None:
+                        val_index = fil_idx - 1
                     if 0 <= val_index < len(value):
                         value = value[val_index]
                     elif len(value) == 1:
@@ -353,6 +388,7 @@ class ThreeMFAnalyzer:
         profile['printer'] = self.project_settings.get('printer_settings_id', 'Unknown')
         profile['process'] = self.project_settings.get('print_settings_id', 'Unknown')
         profile['filaments'] = self.project_settings.get('filament_settings_id', ['Unknown'])
+        profile['flow_mode'] = self.flow.mode_label(self._filament_count())
         profile['initial_layer_print_height'] = self._get_value('initial_layer_print_height', '')
         # Support both legacy and current first-layer temperature keys.
         profile['first_layer_nozzle_temperature'] = (
